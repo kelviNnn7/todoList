@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { addDays, format, isSameDay, isToday } from "date-fns";
 import { zhCN } from "date-fns/locale";
-import { BellRing, BriefcaseBusiness, CalendarDays, Check, Expand, Lock, Menu, Minimize2, Plus, Unlock } from "lucide-react";
+import { BellRing, BriefcaseBusiness, CalendarDays, Check, ChevronLeft, ChevronRight, Ellipsis, Expand, Lock, Minimize2, Plus, Unlock } from "lucide-react";
 import { ItemCard } from "./components/ItemCard";
 import { ItemForm } from "./components/ItemForm";
 import { dateKey, itemsForDate, longDate, sortItems, twoWeekDays } from "./lib/calendar";
@@ -95,11 +95,15 @@ export default function App() {
   return <main className={`app-shell ${expandedWindow ? "expanded" : ""}`}>
     <div className="drag-region" data-tauri-drag-region={locked ? undefined : ""} />
     <header className="topbar" data-tauri-drag-region={locked ? undefined : ""}>
-      <div className="date-heading" data-tauri-drag-region={locked ? undefined : ""}><span>{format(new Date(), "yyyy")}</span><h1>{longDate(new Date())}</h1></div>
+      <div className="date-heading" data-tauri-drag-region={locked ? undefined : ""}>
+        <span className="brand-line" data-tauri-drag-region={locked ? undefined : ""}><i className="app-glyph"><Check size={11} strokeWidth={3}/></i>钉事 · PinDo</span>
+        <h1 data-tauri-drag-region={locked ? undefined : ""}>{longDate(new Date())}</h1>
+      </div>
       <div className="top-actions">
         <button className="icon-button" aria-label={locked ? "解锁位置" : "锁定位置"} title={locked ? "解锁位置" : "锁定位置"} onClick={toggleLock}>{locked ? <Lock size={17}/> : <Unlock size={17}/>}</button>
         <button className="icon-button" aria-label={expandedWindow ? "收起挂件" : "展开窗口"} title={expandedWindow ? "收起挂件" : "展开窗口"} onClick={toggleWindow}>{expandedWindow ? <Minimize2 size={17}/> : <Expand size={17}/>}</button>
-        <button className="icon-button" aria-label="菜单" title="菜单" onClick={() => setMenuOpen((value) => !value)}><Menu size={18}/></button>
+        <button className={`icon-button ${menuOpen ? "pressed" : ""}`} aria-label="更多选项" title="更多选项" aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}><Ellipsis size={19}/></button>
+        <span className="toolbar-divider" aria-hidden="true"/>
         <button className="add-button" onClick={() => setFormType(filter === "meeting" ? "meeting" : "task")} aria-label="新增事项"><Plus size={19}/></button>
         {menuOpen && <div className="app-menu"><button onClick={() => importInput.current?.click()}>导入 ICS 日历</button><button onClick={() => void toggleAutostart()}>开机自启：{autostart ? "开" : "关"}</button><small>数据仅保存在本机</small></div>}
         <input ref={importInput} className="visually-hidden" type="file" accept=".ics,text/calendar" onChange={(event) => void importIcsFile(event.target.files?.[0])}/>
@@ -107,13 +111,13 @@ export default function App() {
     </header>
 
     <nav className="filters" aria-label="事项筛选">
-      <button className={filter === "all" ? "active" : ""} onClick={() => setFilter("all")}><CalendarDays size={16}/>全部<span>{counts.task + counts.meeting}</span></button>
-      <button className={filter === "task" ? "active" : ""} onClick={() => setFilter("task")}><BriefcaseBusiness size={16}/>工作清单<span>{counts.task}</span></button>
-      <button className={filter === "meeting" ? "active" : ""} onClick={() => setFilter("meeting")}><BellRing size={16}/>会议<span>{counts.meeting}</span></button>
+      <button className={filter === "all" ? "active" : ""} aria-pressed={filter === "all"} onClick={() => setFilter("all")}><CalendarDays size={15}/>全部<span>{counts.task + counts.meeting}</span></button>
+      <button className={filter === "task" ? "active" : ""} aria-pressed={filter === "task"} onClick={() => setFilter("task")}><BriefcaseBusiness size={15}/>工作清单<span>{counts.task}</span></button>
+      <button className={filter === "meeting" ? "active" : ""} aria-pressed={filter === "meeting"} onClick={() => setFilter("meeting")}><BellRing size={15}/>会议<span>{counts.meeting}</span></button>
     </nav>
 
     <section className="calendar-panel">
-      <div className="calendar-toolbar"><button onClick={() => setCalendarAnchor(addDays(calendarAnchor, -14))} aria-label="前两周">‹</button><span>{format(days[0], "M月d日")} — {format(days[13], "M月d日")}</span><button onClick={() => setCalendarAnchor(addDays(calendarAnchor, 14))} aria-label="后两周">›</button></div>
+      <div className="calendar-toolbar"><button onClick={() => setCalendarAnchor(addDays(calendarAnchor, -14))} aria-label="前两周"><ChevronLeft size={15}/></button><span>{format(days[0], "M月d日")} — {format(days[13], "M月d日")}</span><button onClick={() => setCalendarAnchor(addDays(calendarAnchor, 14))} aria-label="后两周"><ChevronRight size={15}/></button></div>
       <div className="calendar-grid">
         {days.map((day) => { const dayItems = itemsForDate(items, day); return <button key={dateKey(day)} className={`${isSameDay(day, selectedDate) ? "selected" : ""} ${isToday(day) ? "today" : ""}`} onClick={() => setSelectedDate(day)}><span>{format(day, "EEE", { locale: zhCN })}</span><strong>{format(day, "d")}</strong><i>{dayItems.length > 0 && Math.min(dayItems.length, 9)}</i></button>; })}
       </div>
