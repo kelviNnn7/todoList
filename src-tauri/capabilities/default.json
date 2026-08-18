@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "PinDo 主窗口的最小必要权限",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "notification:default",
+    "window-state:default",
+    "autostart:default"
+  ]
+}

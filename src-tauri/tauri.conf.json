@@ -1,0 +1,47 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "钉事 PinDo",
+  "version": "0.1.0",
+  "identifier": "com.pindo.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "钉事 PinDo",
+        "width": 360,
+        "height": 620,
+        "minWidth": 340,
+        "minHeight": 520,
+        "center": true,
+        "decorations": false,
+        "transparent": true,
+        "resizable": false,
+        "alwaysOnTop": false,
+        "skipTaskbar": false,
+        "shadow": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src ipc: http://ipc.localhost",
+      "capabilities": ["default"]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Productivity",
+    "shortDescription": "轻量桌面任务与会议挂件",
+    "longDescription": "钉事 PinDo 将未来两周的任务、子任务与会议提醒常驻桌面。",
+    "copyright": "Copyright © 2026 PinDo contributors",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
+    "macOS": { "minimumSystemVersion": "13.0" },
+    "windows": { "webviewInstallMode": { "type": "downloadBootstrapper" } }
+  }
+}
