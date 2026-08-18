@@ -72,6 +72,20 @@ fn set_position_locked(_window: WebviewWindow, _locked: bool) -> Result<(), Stri
     Ok(())
 }
 
+#[tauri::command]
+fn set_desktop_widget_mode(window: WebviewWindow, enabled: bool) -> Result<(), String> {
+    window
+        .set_always_on_top(false)
+        .map_err(|error| error.to_string())?;
+    window
+        .set_always_on_bottom(enabled)
+        .map_err(|error| error.to_string())?;
+    window
+        .set_skip_taskbar(enabled)
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
@@ -86,7 +100,7 @@ pub fn run() {
             MacosLauncher::LaunchAgent,
             Some(vec!["--silent"]),
         ))
-        .invoke_handler(tauri::generate_handler![list_items, upsert_item, delete_item, set_window_mode, set_position_locked])
+        .invoke_handler(tauri::generate_handler![list_items, upsert_item, delete_item, set_window_mode, set_position_locked, set_desktop_widget_mode])
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;

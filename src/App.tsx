@@ -10,6 +10,10 @@ import { deleteItem, loadItems, saveItem } from "./lib/storage";
 import type { FilterType, ItemType, TodoItem } from "./types";
 
 const isTauri = () => "__TAURI_INTERNALS__" in window;
+const savedOpacity = () => {
+  const value = Number(localStorage.getItem("pindo.appearanceOpacity"));
+  return Number.isFinite(value) && value >= 55 && value <= 100 ? Math.round(value / 5) * 5 : 95;
+};
 
 export default function App() {
   const [items, setItems] = useState<TodoItem[]>([]);
@@ -21,6 +25,8 @@ export default function App() {
   const [expandedWindow, setExpandedWindow] = useState(false);
   const [locked, setLocked] = useState(() => localStorage.getItem("pindo.positionLocked") === "true");
   const [autostart, setAutostart] = useState(false);
+  const [desktopWidget, setDesktopWidget] = useState(() => localStorage.getItem("pindo.desktopWidget") === "true");
+  const [appearanceOpacity, setAppearanceOpacity] = useState(savedOpacity);
   const [menuOpen, setMenuOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const importInput = useRef<HTMLInputElement>(null);
@@ -31,6 +37,10 @@ export default function App() {
     if (!isTauri()) return;
     import("@tauri-apps/plugin-autostart").then(({ isEnabled }) => isEnabled().then(setAutostart)).catch(() => setAutostart(false));
   }, []);
+  useEffect(() => {
+    if (!isTauri()) return;
+    import("@tauri-apps/api/core").then(({ invoke }) => invoke("set_desktop_widget_mode", { enabled: desktopWidget })).catch(() => undefined);
+  }, [desktopWidget]);
 
   const persist = useCallback(async (item: TodoItem) => {
     await saveItem(item);
@@ -81,6 +91,27 @@ export default function App() {
     window.setTimeout(() => setNotice(""), 2500);
   }
 
+  async function toggleDesktopWidget() {
+    const next = !desktopWidget;
+    setDesktopWidget(next);
+    localStorage.setItem("pindo.desktopWidget", String(next));
+    if (next && expandedWindow) {
+      setExpandedWindow(false);
+      if (isTauri()) {
+        const { invoke } = await import("@tauri-apps/api/core");
+        await invoke("set_window_mode", { expanded: false });
+      }
+    }
+    setNotice(next ? "已切换为桌面小组件" : "已恢复普通窗口模式");
+    window.setTimeout(() => setNotice(""), 2200);
+  }
+
+  function updateAppearanceOpacity(value: number) {
+    const next = Math.min(100, Math.max(55, value));
+    setAppearanceOpacity(next);
+    localStorage.setItem("pindo.appearanceOpacity", String(next));
+  }
+
   async function importIcsFile(file: File | undefined) {
     if (!file) return;
     try {
@@ -92,7 +123,7 @@ export default function App() {
     finally { if (importInput.current) importInput.current.value = ""; setMenuOpen(false); window.setTimeout(() => setNotice(""), 3500); }
   }
 
-  return <main className={`app-shell ${expandedWindow ? "expanded" : ""}`}>
+  return <main className={`app-shell ${expandedWindow ? "expanded" : ""} ${desktopWidget ? "desktop-widget" : ""}`} style={{ "--widget-opacity": appearanceOpacity / 100 } as React.CSSProperties}>
     <div className="drag-region" data-tauri-drag-region={locked ? undefined : ""} />
     <header className="topbar" data-tauri-drag-region={locked ? undefined : ""}>
       <div className="date-heading" data-tauri-drag-region={locked ? undefined : ""}>
@@ -105,7 +136,13 @@ export default function App() {
         <button className={`icon-button ${menuOpen ? "pressed" : ""}`} aria-label="更多选项" title="更多选项" aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}><Ellipsis size={19}/></button>
         <span className="toolbar-divider" aria-hidden="true"/>
         <button className="add-button" onClick={() => setFormType(filter === "meeting" ? "meeting" : "task")} aria-label="新增事项"><Plus size={19}/></button>
-        {menuOpen && <div className="app-menu"><button onClick={() => importInput.current?.click()}>导入 ICS 日历</button><button onClick={() => void toggleAutostart()}>开机自启：{autostart ? "开" : "关"}</button><small>数据仅保存在本机</small></div>}
+        {menuOpen && <div className="app-menu" role="dialog" aria-label="更多设置">
+          <span className="menu-title">小组件</span>
+          <label className="menu-setting"><span><strong>桌面小组件</strong><small>驻留桌面，不遮挡其他窗口</small></span><input type="checkbox" checked={desktopWidget} onChange={() => void toggleDesktopWidget()}/><i aria-hidden="true"/></label>
+          <label className="opacity-setting"><span>外观透明度<output>{appearanceOpacity}%</output></span><input aria-label="外观透明度" type="range" min="55" max="100" step="5" value={appearanceOpacity} onChange={(event) => updateAppearanceOpacity(Number(event.target.value))}/></label>
+          <div className="menu-divider"/>
+          <button onClick={() => importInput.current?.click()}>导入 ICS 日历</button><button onClick={() => void toggleAutostart()}>开机自启：{autostart ? "开" : "关"}</button><small className="menu-footnote">设置与数据仅保存在本机</small>
+        </div>}
         <input ref={importInput} className="visually-hidden" type="file" accept=".ics,text/calendar" onChange={(event) => void importIcsFile(event.target.files?.[0])}/>
       </div>
     </header>
