@@ -4,7 +4,8 @@ import type { TodoItem } from "../types";
 
 const makeItem = (id: string, title = "本地任务"): TodoItem => ({
   id, type: "task", title, notes: "", startAt: null, endAt: null, dueAt: null, location: "", meetingUrl: "",
-  reminderMinutes: null, reminderSentAt: null, completed: false, source: "local", subtasks: [], createdAt: "2026-08-18T00:00:00.000Z", updatedAt: "2026-08-18T00:00:00.000Z",
+  reminderMinutes: null, reminderSentAt: null, reminderAt: null, reminderStatus: "none", snoozeCount: 0, lastReminderAt: null,
+  completed: false, source: "local", subtasks: [], createdAt: "2026-08-18T00:00:00.000Z", updatedAt: "2026-08-18T00:00:00.000Z",
 });
 
 describe("storage browser fallback", () => {
@@ -22,5 +23,11 @@ describe("storage browser fallback", () => {
   it("过滤结构不合法的数据", async () => {
     localStorage.setItem("pindo.items.v1", JSON.stringify([{ id: 7 }, makeItem("ok")]));
     expect(await loadItems()).toEqual([makeItem("ok")]);
+  });
+  it("无损迁移 v0.1 数据并补齐提醒默认值", async () => {
+    const legacy = makeItem("legacy") as Partial<TodoItem>;
+    delete legacy.reminderAt; delete legacy.reminderStatus; delete legacy.snoozeCount; delete legacy.lastReminderAt;
+    localStorage.setItem("pindo.items.v1", JSON.stringify([legacy]));
+    expect((await loadItems())[0]).toMatchObject({ id: "legacy", reminderAt: null, reminderStatus: "none", snoozeCount: 0, lastReminderAt: null });
   });
 });

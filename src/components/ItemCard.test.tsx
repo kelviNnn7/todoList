@@ -7,7 +7,8 @@ import type { TodoItem } from "../types";
 const task: TodoItem = {
   id: "task-1", type: "task", title: "发布桌面应用", notes: "上线前复核", startAt: null, endAt: null,
   dueAt: new Date(2026, 7, 20, 23, 59).toISOString(), location: "", meetingUrl: "", reminderMinutes: null,
-  reminderSentAt: null, completed: false, source: "local", subtasks: [{ id: "sub-1", title: "完成测试", completed: false, dueAt: null }],
+  reminderSentAt: null, reminderAt: null, reminderStatus: "none", snoozeCount: 0, lastReminderAt: null,
+  completed: false, source: "local", subtasks: [{ id: "sub-1", title: "完成测试", completed: false, dueAt: null }],
   createdAt: "2026-08-18T00:00:00.000Z", updatedAt: "2026-08-18T00:00:00.000Z",
 };
 

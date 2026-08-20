@@ -1,10 +1,17 @@
-import { addDays, format, isBefore, isSameDay, parseISO, startOfDay, startOfWeek } from "date-fns";
+import { addDays, endOfMonth, endOfWeek, format, isBefore, isSameDay, parseISO, startOfDay, startOfMonth, startOfWeek } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import type { TodoItem } from "../types";
 
-export function twoWeekDays(anchor: Date): Date[] {
-  const monday = startOfWeek(anchor, { weekStartsOn: 1 });
-  return Array.from({ length: 14 }, (_, index) => addDays(monday, index));
+export function weekDays(anchor: Date): Date[] {
+  const first = startOfDay(anchor);
+  return Array.from({ length: 7 }, (_, index) => addDays(first, index));
+}
+
+export function monthDays(anchor: Date): Date[] {
+  const first = startOfWeek(startOfMonth(anchor), { weekStartsOn: 1 });
+  const last = endOfWeek(endOfMonth(anchor), { weekStartsOn: 1 });
+  const count = Math.round((startOfDay(last).getTime() - startOfDay(first).getTime()) / 86_400_000) + 1;
+  return Array.from({ length: count }, (_, index) => addDays(first, index));
 }
 
 export function itemDate(item: TodoItem): Date | null {

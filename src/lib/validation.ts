@@ -20,6 +20,10 @@ export function validateDraft(draft: ItemDraft): ValidationErrors {
     }
   }
 
+  if (draft.type === "task" && draft.taskReminderAt && Number.isNaN(new Date(draft.taskReminderAt).getTime())) {
+    errors.reminderAt = "任务提醒时间格式不正确";
+  }
+
   if (draft.subtasks.some((subtask) => !subtask.title.trim())) errors.subtasks = "子任务标题不能为空";
   const parentDue = draft.date ? new Date(`${draft.date}T23:59:59`).getTime() : null;
   if (parentDue && draft.subtasks.some((subtask) => subtask.dueAt && new Date(subtask.dueAt).getTime() > parentDue)) {

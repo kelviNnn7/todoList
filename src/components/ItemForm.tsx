@@ -6,7 +6,7 @@ import { validateDraft } from "../lib/validation";
 
 const initialDraft = (date: Date, type: ItemType): ItemDraft => ({
   type, title: "", notes: "", date: format(date, "yyyy-MM-dd"), startTime: "09:30", endTime: "10:00",
-  location: "", meetingUrl: "", reminderMinutes: 15, subtasks: [],
+  location: "", meetingUrl: "", reminderMinutes: 15, taskReminderAt: "", subtasks: [],
 });
 
 interface Props { date: Date; initialType: ItemType; onClose: () => void; onSave: (item: TodoItem) => Promise<void> }
@@ -28,7 +28,10 @@ export function ItemForm({ date, initialType, onClose, onSave }: Props) {
       id: crypto.randomUUID(), type: draft.type, title: draft.title.trim(), notes: draft.notes.trim(), startAt, endAt,
       dueAt: draft.type === "task" && draft.date ? new Date(`${draft.date}T23:59:59`).toISOString() : null,
       location: draft.location.trim(), meetingUrl: draft.meetingUrl.trim(), reminderMinutes: draft.type === "meeting" ? draft.reminderMinutes : null,
-      reminderSentAt: null, completed: false, source: "local",
+      reminderSentAt: null,
+      reminderAt: draft.type === "task" && draft.taskReminderAt ? new Date(draft.taskReminderAt).toISOString() : null,
+      reminderStatus: draft.type === "task" && draft.taskReminderAt ? "pending" : "none",
+      snoozeCount: 0, lastReminderAt: null, completed: false, source: "local",
       subtasks: draft.subtasks.map((subtask) => ({ id: crypto.randomUUID(), title: subtask.title.trim(), completed: false, dueAt: subtask.dueAt ? new Date(subtask.dueAt).toISOString() : null })),
       createdAt: now, updatedAt: now,
     };
@@ -50,7 +53,7 @@ export function ItemForm({ date, initialType, onClose, onSave }: Props) {
         {draft.type === "meeting" ? <>
           <div className="form-row"><label>地点<input maxLength={200} value={draft.location} onChange={(e) => update("location", e.target.value)} placeholder="可选"/></label><label>提前提醒<select value={draft.reminderMinutes} onChange={(e) => update("reminderMinutes", Number(e.target.value))}><option value={5}>5 分钟</option><option value={15}>15 分钟</option><option value={30}>30 分钟</option><option value={60}>60 分钟</option></select></label></div>
           <label>会议链接<input value={draft.meetingUrl} onChange={(e) => update("meetingUrl", e.target.value)} placeholder="https://"/>{submitted && errors.meetingUrl && <span className="field-error">{errors.meetingUrl}</span>}</label>
-        </> : <div className="subtasks"><div className="section-label"><span>子任务</span><button type="button" onClick={() => update("subtasks", [...draft.subtasks, { title: "", dueAt: "" }])}><Plus size={14}/>添加</button></div>
+        </> : <div className="subtasks"><label>任务提醒<input aria-label="任务提醒时间" type="datetime-local" value={draft.taskReminderAt} onChange={(e) => update("taskReminderAt", e.target.value)}/><small className="field-hint">可选；触发后可稍后 30 分钟、1 小时或明天 9:00 再提醒</small>{submitted && errors.reminderAt && <span className="field-error">{errors.reminderAt}</span>}</label><div className="section-label"><span>子任务</span><button type="button" onClick={() => update("subtasks", [...draft.subtasks, { title: "", dueAt: "" }])}><Plus size={14}/>添加</button></div>
           {draft.subtasks.map((subtask, index) => <div className="subtask-edit" key={index}><input aria-label={`子任务 ${index + 1}`} maxLength={160} value={subtask.title} onChange={(e) => update("subtasks", draft.subtasks.map((item, i) => i === index ? { ...item, title: e.target.value } : item))}/><input aria-label={`子任务 ${index + 1} 计划时间`} type="datetime-local" value={subtask.dueAt} onChange={(e) => update("subtasks", draft.subtasks.map((item, i) => i === index ? { ...item, dueAt: e.target.value } : item))}/><button type="button" className="icon-button" onClick={() => update("subtasks", draft.subtasks.filter((_, i) => i !== index))} aria-label="删除子任务"><Trash2 size={16}/></button></div>)}
           {submitted && errors.subtasks && <span className="field-error">{errors.subtasks}</span>}
         </div>}

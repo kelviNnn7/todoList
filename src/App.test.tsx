@@ -5,10 +5,17 @@ import App from "./App";
 
 describe("App", () => {
   beforeEach(() => localStorage.clear());
-  it("显示两周日历和空状态", async () => {
+  it("挂件默认显示周视图和空状态", async () => {
     const { container } = render(<App/>);
     expect(await screen.findByText("这一天很清爽")).toBeInTheDocument();
-    expect(container.querySelectorAll(".calendar-grid button")).toHaveLength(14);
+    expect(container.querySelectorAll(".calendar-grid button")).toHaveLength(7);
+  });
+  it("可以切换为完整月视图并分别保存偏好", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App/>);
+    await user.click(screen.getByRole("button", { name: "月" }));
+    expect(container.querySelectorAll(".calendar-grid button").length).toBeGreaterThanOrEqual(35);
+    expect(localStorage.getItem("pindo.calendarView.widget")).toBe("month");
   });
   it("可以打开新增会议表单并校验", async () => {
     const user = userEvent.setup(); render(<App/>);

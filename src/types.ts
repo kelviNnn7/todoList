@@ -1,5 +1,7 @@
 export type ItemType = "task" | "meeting";
 export type FilterType = "all" | ItemType;
+export type CalendarViewMode = "week" | "month";
+export type ReminderStatus = "none" | "pending" | "fired" | "snoozed";
 
 export interface Subtask {
   id: string;
@@ -20,6 +22,10 @@ export interface TodoItem {
   meetingUrl: string;
   reminderMinutes: number | null;
   reminderSentAt: string | null;
+  reminderAt: string | null;
+  reminderStatus: ReminderStatus;
+  snoozeCount: number;
+  lastReminderAt: string | null;
   completed: boolean;
   source: "local" | "calendar" | "ics";
   subtasks: Subtask[];
@@ -37,5 +43,6 @@ export interface ItemDraft {
   location: string;
   meetingUrl: string;
   reminderMinutes: number;
+  taskReminderAt: string;
   subtasks: Array<{ title: string; dueAt: string }>;
 }

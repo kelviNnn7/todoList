@@ -37,7 +37,8 @@ export function parseIcs(content: string): TodoItem[] {
       type: "meeting" as const, title: title.slice(0, 160), notes: unescapeText(event.DESCRIPTION || "").slice(0, 4000),
       startAt: start.toISOString(), endAt: event.DTEND ? parseIcsDate(event.DTEND)?.toISOString() ?? null : null, dueAt: null,
       location: unescapeText(event.LOCATION || "").slice(0, 200), meetingUrl: /^https?:\/\//i.test(event.URL || "") ? event.URL : "",
-      reminderMinutes: 15, reminderSentAt: null, completed: false, source: "ics" as const, subtasks: [], createdAt: now, updatedAt: now,
+      reminderMinutes: 15, reminderSentAt: null, reminderAt: null, reminderStatus: "none" as const,
+      snoozeCount: 0, lastReminderAt: null, completed: false, source: "ics" as const, subtasks: [], createdAt: now, updatedAt: now,
     }];
   });
 }

@@ -1,6 +1,6 @@
 [package]
 name = "pindo"
-version = "0.1.0"
+version = "0.2.0"
 description = "轻量跨平台桌面待办挂件"
 authors = ["PinDo contributors"]
 edition = "2021"
@@ -16,6 +16,7 @@ tauri-build = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rusqlite = { version = "0.38", features = ["bundled"] }
+notify-rust = "4.18"
 tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-notification = "2"

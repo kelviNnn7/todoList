@@ -6,9 +6,16 @@ const inTauri = () => "__TAURI_INTERNALS__" in window;
 
 function safeParse(payload: string): TodoItem | null {
   try {
-    const value = JSON.parse(payload) as TodoItem;
+    const value = JSON.parse(payload) as Partial<TodoItem>;
     if (!value || typeof value.id !== "string" || typeof value.title !== "string") return null;
-    return { ...value, subtasks: Array.isArray(value.subtasks) ? value.subtasks : [] };
+    return {
+      ...value,
+      reminderAt: typeof value.reminderAt === "string" ? value.reminderAt : null,
+      reminderStatus: ["pending", "fired", "snoozed"].includes(value.reminderStatus ?? "") ? value.reminderStatus! : "none",
+      snoozeCount: Number.isInteger(value.snoozeCount) && value.snoozeCount! >= 0 ? value.snoozeCount! : 0,
+      lastReminderAt: typeof value.lastReminderAt === "string" ? value.lastReminderAt : null,
+      subtasks: Array.isArray(value.subtasks) ? value.subtasks : [],
+    } as TodoItem;
   } catch { return null; }
 }
 

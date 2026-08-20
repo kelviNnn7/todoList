@@ -1,0 +1,41 @@
+name: PindoNative
+options:
+  deploymentTarget:
+    macOS: "13.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "13.0"
+targets:
+  PindoWidget:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: PindoWidget
+        excludes:
+          - Info.plist
+          - PindoWidget.entitlements
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.pindo.desktop.widget
+        PRODUCT_NAME: PindoWidget
+        INFOPLIST_FILE: PindoWidget/Info.plist
+        CODE_SIGN_ENTITLEMENTS: PindoWidget/PindoWidget.entitlements
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES
+  PindoWidgetReloader:
+    type: tool
+    platform: macOS
+    sources:
+      - path: PindoWidgetReloader
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.pindo.desktop.widget-reloader
+        PRODUCT_NAME: PindoWidgetReloader
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  PindoNative:
+    build:
+      targets:
+        PindoWidget: all
+        PindoWidgetReloader: all
