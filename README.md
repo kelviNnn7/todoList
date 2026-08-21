@@ -1,4 +1,4 @@
-# 钉事 PinDo
+# BluNote
 
 一个面向 macOS 13+ 与 Windows 10 21H2+ 的轻量桌面 To-Do 挂件。界面采用柔和毛玻璃、圆角卡片和周/月日历，任务、会议与子任务都保存在本机。
 
@@ -39,7 +39,7 @@ macOS 产物位于 `src-tauri/target/release/bundle/dmg`，Windows 安装包位�
 
 ## 数据与隐私
 
-PinDo v0.2 没有账号、云同步或遥测。数据位于操作系统应用数据目录中的 `pindo.db`，不会上传。macOS 原生小组件仅通过 App Group 读取本机快照；ICS 文件仅在本机解析，导入会议以只读来源标记。
+BluNote v0.2 没有账号、云同步或遥测。数据位于操作系统应用数据目录中的 `pindo.db`，不会上传。macOS 原生小组件仅通过兼容 App Group 读取本机快照；ICS 文件仅在本机解析，导入会议以只读来源标记。
 
 ## 当前发布范围
 

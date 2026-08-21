@@ -72,7 +72,7 @@ struct PindoWidgetView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: "checkmark.square.fill").foregroundStyle(.blue)
-                Text("钉事 · 今天").font(.system(size: 13, weight: .semibold))
+                Text("BluNote · 今天").font(.system(size: 13, weight: .semibold))
                 Spacer()
                 Text(entry.date, style: .date).font(.caption2).foregroundStyle(.secondary)
             }
@@ -117,7 +117,7 @@ struct PindoWidget: Widget {
     let kind = "PindoWidget"
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: PindoProvider()) { entry in PindoWidgetView(entry: entry) }
-            .configurationDisplayName("钉事 · 今天")
+            .configurationDisplayName("BluNote · 今天")
             .description("查看今天的任务和最近会议。")
             .supportedFamilies([.systemSmall, .systemMedium])
     }

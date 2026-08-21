@@ -9,7 +9,8 @@ use std::{
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem},
     tray::TrayIconBuilder,
-    Emitter, LogicalSize, Manager, PhysicalPosition, Position, Size, WebviewWindow, WindowEvent,
+    Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalSize, Position, Size, WebviewWindow,
+    WindowEvent,
 };
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
@@ -62,6 +63,37 @@ fn snap_coordinate(value: i32, target: i32) -> i32 {
     } else {
         value
     }
+}
+
+fn clamp_axis(value: i32, origin: i32, work_extent: u32, window_extent: u32) -> i32 {
+    let origin = i64::from(origin);
+    let far_edge = (origin + i64::from(work_extent) - i64::from(window_extent)).max(origin);
+    i64::from(value).clamp(origin, far_edge) as i32
+}
+
+fn clamp_window_position(
+    position: PhysicalPosition<i32>,
+    size: PhysicalSize<u32>,
+    work_position: PhysicalPosition<i32>,
+    work_size: PhysicalSize<u32>,
+) -> PhysicalPosition<i32> {
+    PhysicalPosition::new(
+        clamp_axis(position.x, work_position.x, work_size.width, size.width),
+        clamp_axis(position.y, work_position.y, work_size.height, size.height),
+    )
+}
+
+fn schedule_window_state_save(window: &tauri::Window) {
+    let preferences = window.state::<WindowPreferences>();
+    let epoch = preferences.move_epoch.fetch_add(1, Ordering::Relaxed) + 1;
+    let app = window.app_handle().clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(500));
+        let preferences = app.state::<WindowPreferences>();
+        if preferences.move_epoch.load(Ordering::Relaxed) == epoch {
+            let _ = app.save_window_state(StateFlags::POSITION | StateFlags::SIZE);
+        }
+    });
 }
 
 fn write_widget_snapshot(
@@ -247,10 +279,10 @@ fn set_window_mode(window: WebviewWindow, expanded: bool) -> Result<(), String> 
         LogicalSize::new(360.0, 620.0)
     };
     window
-        .set_size(Size::Logical(size))
+        .set_resizable(true)
         .map_err(|error| error.to_string())?;
     window
-        .set_resizable(expanded)
+        .set_size(Size::Logical(size))
         .map_err(|error| error.to_string())?;
     Ok(())
 }
@@ -339,12 +371,12 @@ pub fn run() {
                     eprintln!("failed to initialize widget snapshot: {error}");
                 }
             }
-            let show = MenuItem::with_id(app, "show", "显示钉事", true, None::<&str>)?;
+            let show = MenuItem::with_id(app, "show", "显示 BluNote", true, None::<&str>)?;
             let lock = CheckMenuItem::with_id(app, "lock", "锁定位置", true, false, None::<&str>)?;
             if let Ok(mut item) = app.state::<TrayState>().0.lock() {
                 *item = Some(lock.clone());
             }
-            let quit = MenuItem::with_id(app, "quit", "退出钉事", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "退出 BluNote", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show, &lock, &quit])?;
             let lock_menu = lock.clone();
             TrayIconBuilder::new()
@@ -353,7 +385,7 @@ pub fn run() {
                         .cloned()
                         .expect("application icon is required"),
                 )
-                .tooltip("钉事 PinDo")
+                .tooltip("BluNote")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(move |app, event| match event.id.as_ref() {
@@ -383,42 +415,60 @@ pub fn run() {
             }
             WindowEvent::Moved(position) => {
                 let preferences = window.state::<WindowPreferences>();
-                if !preferences.locked.load(Ordering::Relaxed)
-                    && preferences.edge_snap.load(Ordering::Relaxed)
-                {
-                    if let (Ok(Some(monitor)), Ok(size)) =
-                        (window.current_monitor(), window.outer_size())
+                let monitor = window
+                    .current_monitor()
+                    .ok()
+                    .flatten()
+                    .or_else(|| window.primary_monitor().ok().flatten());
+                if let (Some(monitor), Ok(size)) = (monitor, window.outer_size()) {
+                    let area = monitor.work_area();
+                    let mut target = *position;
+                    if !preferences.locked.load(Ordering::Relaxed)
+                        && preferences.edge_snap.load(Ordering::Relaxed)
                     {
-                        let area = monitor.work_area();
                         let right = area.position.x + area.size.width as i32 - size.width as i32;
                         let bottom = area.position.y + area.size.height as i32 - size.height as i32;
-                        let target = PhysicalPosition::new(
-                            snap_coordinate(position.x, area.position.x),
-                            snap_coordinate(position.y, area.position.y),
-                        );
-                        let target = PhysicalPosition::new(
-                            snap_coordinate(target.x, right),
-                            snap_coordinate(target.y, bottom),
-                        );
-                        if target != *position {
+                        target.x = snap_coordinate(target.x, area.position.x);
+                        target.y = snap_coordinate(target.y, area.position.y);
+                        target.x = snap_coordinate(target.x, right);
+                        target.y = snap_coordinate(target.y, bottom);
+                    }
+                    target = clamp_window_position(target, size, area.position, area.size);
+                    if target != *position {
+                        let _ = window.set_position(Position::Physical(target));
+                    }
+                }
+                schedule_window_state_save(window);
+            }
+            WindowEvent::Resized(size) => {
+                let monitor = window
+                    .current_monitor()
+                    .ok()
+                    .flatten()
+                    .or_else(|| window.primary_monitor().ok().flatten());
+                if let Some(monitor) = monitor {
+                    let area = monitor.work_area();
+                    let bounded_size = PhysicalSize::new(
+                        size.width.min(area.size.width),
+                        size.height.min(area.size.height),
+                    );
+                    if bounded_size != *size {
+                        let _ = window.set_size(Size::Physical(bounded_size));
+                    }
+                    if let Ok(position) = window.outer_position() {
+                        let target =
+                            clamp_window_position(position, bounded_size, area.position, area.size);
+                        if target != position {
                             let _ = window.set_position(Position::Physical(target));
                         }
                     }
                 }
-                let epoch = preferences.move_epoch.fetch_add(1, Ordering::Relaxed) + 1;
-                let app = window.app_handle().clone();
-                std::thread::spawn(move || {
-                    std::thread::sleep(Duration::from_millis(500));
-                    let preferences = app.state::<WindowPreferences>();
-                    if preferences.move_epoch.load(Ordering::Relaxed) == epoch {
-                        let _ = app.save_window_state(StateFlags::POSITION);
-                    }
-                });
+                schedule_window_state_save(window);
             }
             _ => {}
         })
         .run(tauri::generate_context!())
-        .expect("failed to run PinDo");
+        .expect("failed to run BluNote");
 }
 
 #[cfg(test)]
@@ -468,5 +518,35 @@ mod tests {
         assert_eq!(snap_coordinate(108, 100), 100);
         assert_eq!(snap_coordinate(109, 100), 109);
         assert_eq!(snap_coordinate(92, 100), 100);
+    }
+
+    #[test]
+    fn window_position_is_kept_inside_visible_work_area() {
+        let work_position = PhysicalPosition::new(-1920, 24);
+        let work_size = PhysicalSize::new(1920, 1056);
+        let window_size = PhysicalSize::new(360, 620);
+        assert_eq!(
+            clamp_window_position(
+                PhysicalPosition::new(-2200, -50),
+                window_size,
+                work_position,
+                work_size,
+            ),
+            PhysicalPosition::new(-1920, 24)
+        );
+        assert_eq!(
+            clamp_window_position(
+                PhysicalPosition::new(0, 900),
+                window_size,
+                work_position,
+                work_size,
+            ),
+            PhysicalPosition::new(-360, 460)
+        );
+    }
+
+    #[test]
+    fn oversized_window_is_anchored_to_work_area_origin() {
+        assert_eq!(clamp_axis(500, 100, 800, 1200), 100);
     }
 }

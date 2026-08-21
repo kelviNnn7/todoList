@@ -18,7 +18,7 @@ npm run tauri build -- --bundles app
 xcodegen generate --spec native/project.yml --project native
 xcodebuild -project native/PindoNative.xcodeproj -scheme PindoNative -configuration Release -derivedDataPath native/build CODE_SIGNING_ALLOWED=NO build
 
-app_path="src-tauri/target/release/bundle/macos/钉事 PinDo.app"
+app_path="src-tauri/target/release/bundle/macos/BluNote.app"
 products="native/build/Build/Products/Release"
 mkdir -p "$app_path/Contents/PlugIns"
 cp -R "$products/PindoWidget.appex" "$app_path/Contents/PlugIns/PindoWidget.appex"
@@ -31,11 +31,11 @@ codesign --verify --deep --strict --verbose=2 "$app_path"
 
 architecture="$(uname -m)"
 output_dir="src-tauri/target/release/bundle/dmg"
-output_path="$output_dir/钉事 PinDo_0.2.0_${architecture}.dmg"
+output_path="$output_dir/BluNote_0.2.2_${architecture}.dmg"
 staging="$(mktemp -d)"
 trap 'rm -rf "$staging"' EXIT
 cp -R "$app_path" "$staging/"
 ln -s /Applications "$staging/Applications"
 mkdir -p "$output_dir"
-hdiutil create -volname "钉事 PinDo" -srcfolder "$staging" -ov -format UDZO "$output_path"
+hdiutil create -volname "BluNote" -srcfolder "$staging" -ov -format UDZO "$output_path"
 echo "$output_path"

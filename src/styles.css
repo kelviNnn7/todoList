@@ -59,8 +59,22 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   background: linear-gradient(135deg, rgba(255,255,255,.34), transparent 35%);
 }
 .app-shell.dragging { opacity: .7; cursor: grabbing; }
-.app-shell.expanded { padding: 28px; grid-template-columns: 286px 1fr; grid-template-rows: auto auto 1fr; gap: 0 30px; }
-.drag-region { position: absolute; z-index: 2; top: 0; left: 44px; right: 44px; height: 14px; }
+.app-shell.expanded { padding: 28px; grid-template-columns: var(--sidebar-width, 286px) minmax(0, 1fr); grid-template-rows: auto auto 1fr; gap: 0 30px; }
+.drag-region { position: absolute; z-index: 2; top: 0; left: 44px; right: 44px; height: 14px; cursor: grab; }
+.topbar { cursor: grab; }
+.position-locked .drag-region, .position-locked .topbar { cursor: default; }
+.window-resize-handle { position: absolute; z-index: 50; user-select: none; touch-action: none; }
+.resize-north, .resize-south { left: 12px; right: 12px; height: 7px; }
+.resize-north { top: 0; cursor: ns-resize; }
+.resize-south { bottom: 0; cursor: ns-resize; }
+.resize-east, .resize-west { top: 12px; bottom: 12px; width: 7px; }
+.resize-east { right: 0; cursor: ew-resize; }
+.resize-west { left: 0; cursor: ew-resize; }
+.resize-northeast, .resize-northwest, .resize-southeast, .resize-southwest { width: 14px; height: 14px; }
+.resize-northeast { top: 0; right: 0; cursor: nesw-resize; }
+.resize-northwest { top: 0; left: 0; cursor: nwse-resize; }
+.resize-southeast { right: 0; bottom: 0; cursor: nwse-resize; }
+.resize-southwest { left: 0; bottom: 0; cursor: nesw-resize; }
 
 .topbar { position: relative; z-index: 3; display: flex; align-items: center; justify-content: space-between; min-width: 0; }
 .date-heading { min-width: 0; }
@@ -76,13 +90,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .app-glyph {
   width: 17px;
   height: 17px;
-  color: white;
   border-radius: 5px;
-  background: linear-gradient(145deg, #2997ff, #0066d6);
-  box-shadow: 0 2px 5px rgba(0, 122, 255, .22), inset 0 .5px rgba(255,255,255,.45);
-  display: inline-grid;
-  place-items: center;
-  font-style: normal;
+  box-shadow: 0 2px 5px rgba(0, 122, 255, .2);
+  display: block;
+  object-fit: cover;
 }
 .date-heading h1 { margin: 2px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-size: 20px; line-height: 25px; letter-spacing: -.035em; font-weight: 700; }
 .top-actions { position: relative; display: flex; align-items: center; gap: 3px; }
@@ -263,6 +274,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .button:disabled { opacity: .55; cursor: wait; }
 
 .expanded .topbar { grid-column: 1 / 3; }
+.panel-resizer { position: absolute; z-index: 8; top: 82px; bottom: 28px; left: calc(28px + var(--sidebar-width, 286px) + 11px); width: 8px; border-radius: 4px; cursor: col-resize; touch-action: none; display: grid; place-items: center; }
+.panel-resizer span { width: 2px; height: 42px; border-radius: 2px; background: var(--separator-strong); opacity: .35; transition: opacity .15s ease, background-color .15s ease; }
+.panel-resizer:hover span, .panel-resizer:focus-visible span, .panel-resizing .panel-resizer span { background: var(--accent); opacity: .8; }
+.panel-resizer:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.panel-resizing { cursor: col-resize; user-select: none; }
 .expanded .filters { grid-column: 1; grid-row: 2; align-self: start; grid-template-columns: 1fr; margin-top: 24px; padding: 6px; border: .5px solid var(--separator); background: var(--material); }
 .expanded .filters button { height: 35px; justify-content: flex-start; padding: 0 11px; }
 .expanded .filters button span { margin-left: auto; }

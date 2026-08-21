@@ -9,6 +9,10 @@ import { parseIcs } from "./lib/ics";
 import { isTaskReminderDue, markReminderFired, quickSnoozeAt, snoozeTask, type QuickSnooze } from "./lib/reminders";
 import { deleteItem, loadItems, saveItem } from "./lib/storage";
 import type { CalendarViewMode, FilterType, ItemType, TodoItem } from "./types";
+import appIcon from "./assets/app-icon.png";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+
+type ResizeDirection = "East" | "North" | "NorthEast" | "NorthWest" | "South" | "SouthEast" | "SouthWest" | "West";
 
 const isTauri = () => "__TAURI_INTERNALS__" in window;
 const savedOpacity = () => {
@@ -18,6 +22,14 @@ const savedOpacity = () => {
 const savedView = (expanded: boolean): CalendarViewMode => {
   const value = localStorage.getItem(`pindo.calendarView.${expanded ? "expanded" : "widget"}`);
   return value === "week" || value === "month" ? value : expanded ? "month" : "week";
+};
+const resizeDirections: ResizeDirection[] = ["North", "NorthEast", "East", "SouthEast", "South", "SouthWest", "West", "NorthWest"];
+const clampSidebarWidth = (value: number) => Math.min(380, Math.max(220, value));
+const savedSidebarWidth = () => {
+  const stored = localStorage.getItem("pindo.sidebarWidth");
+  if (stored === null) return 286;
+  const value = Number(stored);
+  return Number.isFinite(value) ? clampSidebarWidth(value) : 286;
 };
 
 export default function App() {
@@ -38,8 +50,11 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(savedSidebarWidth);
+  const [panelResizing, setPanelResizing] = useState(false);
   const importInput = useRef<HTMLInputElement>(null);
   const itemsRef = useRef(items);
+  const panelResizeStart = useRef({ x: 0, width: 286 });
   const days = useMemo(() => viewMode === "week" ? weekDays(calendarAnchor) : monthDays(calendarAnchor), [calendarAnchor, viewMode]);
 
   useEffect(() => { itemsRef.current = items; }, [items]);
@@ -48,6 +63,25 @@ export default function App() {
     if (!isTauri()) return;
     import("@tauri-apps/plugin-autostart").then(({ isEnabled }) => isEnabled().then(setAutostart)).catch(() => setAutostart(false));
   }, []);
+  useEffect(() => {
+    if (!panelResizing) return;
+    const resize = (event: PointerEvent) => setSidebarWidth(clampSidebarWidth(panelResizeStart.current.width + event.clientX - panelResizeStart.current.x));
+    const finish = () => {
+      setPanelResizing(false);
+      setSidebarWidth((width) => {
+        localStorage.setItem("pindo.sidebarWidth", String(width));
+        return width;
+      });
+    };
+    window.addEventListener("pointermove", resize);
+    window.addEventListener("pointerup", finish, { once: true });
+    window.addEventListener("blur", finish, { once: true });
+    return () => {
+      window.removeEventListener("pointermove", resize);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("blur", finish);
+    };
+  }, [panelResizing]);
   useEffect(() => {
     if (!isTauri()) return;
     import("@tauri-apps/api/core").then(({ invoke }) => invoke("set_desktop_widget_mode", { enabled: desktopWidget })).catch(() => undefined);
@@ -168,17 +202,45 @@ export default function App() {
   }
   const navigateCalendar = (direction: -1 | 1) => setCalendarAnchor((current) => viewMode === "week" ? addDays(current, direction * 7) : addMonths(current, direction));
   const calendarTitle = viewMode === "week" ? `${format(days[0], "M月d日")} — ${format(days[6], "M月d日")}` : format(calendarAnchor, "yyyy年 M月");
+  function startWindowResize(direction: ResizeDirection, event: React.PointerEvent) {
+    event.preventDefault(); event.stopPropagation();
+    if (!isTauri()) return;
+    void getCurrentWindow().startResizeDragging(direction);
+  }
+  function startWindowDrag(event: React.MouseEvent) {
+    if (locked || event.button !== 0 || (event.target as HTMLElement).closest("button,input,select,textarea,a,[role=separator]")) return;
+    event.preventDefault();
+    setDragging(true);
+    if (!isTauri()) return;
+    void getCurrentWindow().startDragging().catch(() => setNotice("窗口拖动启动失败，请重试"));
+  }
+  function startPanelResize(event: React.PointerEvent) {
+    event.preventDefault(); event.stopPropagation();
+    panelResizeStart.current = { x: event.clientX, width: sidebarWidth };
+    setPanelResizing(true);
+  }
+  function resizePanelByKeyboard(event: React.KeyboardEvent) {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    setSidebarWidth((width) => {
+      const next = clampSidebarWidth(width + (event.key === "ArrowLeft" ? -10 : 10));
+      localStorage.setItem("pindo.sidebarWidth", String(next));
+      return next;
+    });
+  }
 
-  return <main className={`app-shell ${expandedWindow ? "expanded" : ""} ${desktopWidget ? "desktop-widget" : ""} ${dragging ? "dragging" : ""}`} style={{ "--widget-opacity": appearanceOpacity / 100 } as React.CSSProperties}>
-    <div className="drag-region" data-tauri-drag-region={locked ? undefined : ""} onPointerDown={() => !locked && setDragging(true)}/>
-    <header className="topbar" data-tauri-drag-region={locked ? undefined : ""} onPointerDown={(event) => { if (!locked && !(event.target as HTMLElement).closest("button,input,select,a")) setDragging(true); }}>
-      <div className="date-heading" data-tauri-drag-region={locked ? undefined : ""}><span className="brand-line" data-tauri-drag-region={locked ? undefined : ""}><i className="app-glyph"><Check size={11} strokeWidth={3}/></i>钉事 · PinDo</span><h1 data-tauri-drag-region={locked ? undefined : ""}>{longDate(new Date())}</h1></div>
+  return <main className={`app-shell ${expandedWindow ? "expanded" : ""} ${desktopWidget ? "desktop-widget" : ""} ${locked ? "position-locked" : ""} ${dragging ? "dragging" : ""} ${panelResizing ? "panel-resizing" : ""}`} style={{ "--widget-opacity": appearanceOpacity / 100, "--sidebar-width": `${sidebarWidth}px` } as React.CSSProperties}>
+    {resizeDirections.map((direction) => <div key={direction} className={`window-resize-handle resize-${direction.toLowerCase()}`} aria-hidden="true" onPointerDown={(event) => startWindowResize(direction, event)}/>)}
+    <div className="drag-region" onMouseDown={startWindowDrag}/>
+    <header className="topbar" onMouseDown={startWindowDrag}>
+      <div className="date-heading"><span className="brand-line"><img className="app-glyph" src={appIcon} alt=""/>BluNote</span><h1>{longDate(new Date())}</h1></div>
       <div className="top-actions"><button className="icon-button" aria-label={locked ? "解锁位置" : "锁定位置"} title={locked ? "解锁位置" : "锁定位置"} onClick={toggleLock}>{locked ? <Lock size={17}/> : <Unlock size={17}/>}</button><button className="icon-button" aria-label={expandedWindow ? "收起挂件" : "展开窗口"} title={expandedWindow ? "收起挂件" : "展开窗口"} onClick={toggleWindow}>{expandedWindow ? <Minimize2 size={17}/> : <Expand size={17}/>}</button><button className={`icon-button ${menuOpen ? "pressed" : ""}`} aria-label="更多选项" title="更多选项" aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}><Ellipsis size={19}/></button><span className="toolbar-divider" aria-hidden="true"/><button className="add-button" onClick={() => setFormType(filter === "meeting" ? "meeting" : "task")} aria-label="新增事项"><Plus size={19}/></button>
         {menuOpen && <div className="app-menu" role="dialog" aria-label="更多设置"><span className="menu-title">小组件</span><label className="menu-setting"><span><strong>桌面小组件</strong><small>驻留桌面，不遮挡其他窗口</small></span><input type="checkbox" checked={desktopWidget} onChange={() => void toggleDesktopWidget()}/><i aria-hidden="true"/></label><label className="menu-setting"><span><strong>锁定位置</strong><small>防止意外拖动挂件</small></span><input type="checkbox" checked={locked} onChange={() => void toggleLock()}/><i aria-hidden="true"/></label><label className="menu-setting"><span><strong>边缘吸附</strong><small>靠近屏幕边缘 8px 自动贴合</small></span><input type="checkbox" checked={edgeSnap} onChange={toggleEdgeSnap}/><i aria-hidden="true"/></label><label className="opacity-setting"><span>外观透明度<output>{appearanceOpacity}%</output></span><input aria-label="外观透明度" type="range" min="55" max="100" step="5" value={appearanceOpacity} onChange={(event) => updateAppearanceOpacity(Number(event.target.value))}/></label><div className="menu-divider"/><button onClick={() => importInput.current?.click()}>导入 ICS 日历</button><button onClick={() => void toggleAutostart()}>开机自启：{autostart ? "开" : "关"}</button><small className="menu-footnote">设置与数据仅保存在本机</small></div>}
         <input ref={importInput} className="visually-hidden" type="file" accept=".ics,text/calendar" onChange={(event) => void importIcsFile(event.target.files?.[0])}/>
       </div>
     </header>
     <nav className="filters" aria-label="事项筛选"><button className={filter === "all" ? "active" : ""} aria-pressed={filter === "all"} onClick={() => setFilter("all")}><CalendarDays size={15}/>全部<span>{counts.task + counts.meeting}</span></button><button className={filter === "task" ? "active" : ""} aria-pressed={filter === "task"} onClick={() => setFilter("task")}><BriefcaseBusiness size={15}/>工作清单<span>{counts.task}</span></button><button className={filter === "meeting" ? "active" : ""} aria-pressed={filter === "meeting"} onClick={() => setFilter("meeting")}><BellRing size={15}/>会议<span>{counts.meeting}</span></button></nav>
+    {expandedWindow && <div className="panel-resizer" role="separator" aria-label="调整侧栏宽度" aria-orientation="vertical" aria-valuemin={220} aria-valuemax={380} aria-valuenow={sidebarWidth} tabIndex={0} onPointerDown={startPanelResize} onKeyDown={resizePanelByKeyboard}><span/></div>}
     <section className={`calendar-panel ${viewMode}`}><div className="view-tabs" aria-label="日历视图"><button className={viewMode === "week" ? "active" : ""} aria-pressed={viewMode === "week"} onClick={() => chooseView("week")}>周</button><button className={viewMode === "month" ? "active" : ""} aria-pressed={viewMode === "month"} onClick={() => chooseView("month")}>月</button></div><div className="calendar-toolbar"><button onClick={() => navigateCalendar(-1)} aria-label={viewMode === "week" ? "上一周" : "上个月"}><ChevronLeft size={15}/></button><button className="calendar-title" onClick={() => { const today = new Date(); setCalendarAnchor(today); setSelectedDate(today); }}>{calendarTitle}</button><button onClick={() => navigateCalendar(1)} aria-label={viewMode === "week" ? "下一周" : "下个月"}><ChevronRight size={15}/></button></div><div className="calendar-grid">{days.map((day) => { const dayItems = itemsForDate(items, day); return <button key={dateKey(day)} className={`${isSameDay(day, selectedDate) ? "selected" : ""} ${isToday(day) ? "today" : ""} ${viewMode === "month" && !isSameMonth(day, calendarAnchor) ? "outside-month" : ""}`} onClick={() => setSelectedDate(day)}><span>{format(day, "EEE", { locale: zhCN })}</span><strong>{format(day, "d")}</strong><i>{dayItems.length > 0 && Math.min(dayItems.length, 9)}</i></button>; })}</div></section>
     <section className="agenda"><div className="agenda-heading"><div><span className="eyebrow">{isToday(selectedDate) ? "今天" : format(selectedDate, "EEEE")}</span><h2>{format(selectedDate, "M月d日")}</h2></div><span>{visible.length} 项安排</span></div><div className="item-list">{loading ? <div className="empty-state">正在加载本地数据…</div> : visible.length ? visible.map((item) => <ItemCard key={item.id} item={item} autoExpand={focusedItemId === item.id} onChange={persist} onDelete={remove}/>) : <div className="empty-state"><span className="empty-icon"><Check size={25}/></span><strong>这一天很清爽</strong><p>没有安排，留一点时间给自己。</p><button onClick={() => setFormType(filter === "meeting" ? "meeting" : "task")}><Plus size={15}/>添加事项</button></div>}</div></section>
     {formType && <ItemForm date={selectedDate} initialType={formType} onClose={() => setFormType(null)} onSave={persist}/>} {notice && <div className="toast" role="status">{notice}</div>}
