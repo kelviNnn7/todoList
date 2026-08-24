@@ -127,14 +127,14 @@ fn get_platform_capabilities() -> PlatformCapabilities {
         )
         .to_string();
         let desktop_name = desktop_environment.to_ascii_lowercase();
-        return PlatformCapabilities {
+        PlatformCapabilities {
             os: "linux",
             is_kylin: desktop_name.contains("ukui") || desktop_name.contains("kylin"),
             desktop_environment,
             precise_window_positioning: display_server != "wayland",
             display_server,
             native_widget: false,
-        };
+        }
     }
 
     #[cfg(target_os = "macos")]
