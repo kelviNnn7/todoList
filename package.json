@@ -1,7 +1,7 @@
 {
   "name": "blunote",
   "private": true,
-  "version": "0.2.2",
+  "version": "0.2.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,6 +11,7 @@
     "test:coverage": "vitest run --coverage",
     "lint": "eslint . --max-warnings=0",
     "check": "npm run lint && npm run test && npm run build",
+    "build:kylin": "tauri build --bundles deb,appimage",
     "tauri": "tauri"
   },
   "dependencies": {

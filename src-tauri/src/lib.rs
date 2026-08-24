@@ -15,6 +15,17 @@ use tauri::{
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PlatformCapabilities {
+    os: &'static str,
+    desktop_environment: String,
+    display_server: String,
+    is_kylin: bool,
+    native_widget: bool,
+    precise_window_positioning: bool,
+}
+
 struct DatabaseState(Mutex<Connection>);
 struct TrayState(Mutex<Option<CheckMenuItem<tauri::Wry>>>);
 
@@ -81,6 +92,70 @@ fn clamp_window_position(
         clamp_axis(position.x, work_position.x, work_size.width, size.width),
         clamp_axis(position.y, work_position.y, work_size.height, size.height),
     )
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn linux_display_server(
+    session_type: Option<&str>,
+    wayland_display: Option<&str>,
+    x11_display: Option<&str>,
+) -> &'static str {
+    if session_type.is_some_and(|value| value.eq_ignore_ascii_case("wayland"))
+        || wayland_display.is_some_and(|value| !value.is_empty())
+    {
+        "wayland"
+    } else if session_type.is_some_and(|value| value.eq_ignore_ascii_case("x11"))
+        || x11_display.is_some_and(|value| !value.is_empty())
+    {
+        "x11"
+    } else {
+        "unknown"
+    }
+}
+
+#[tauri::command]
+fn get_platform_capabilities() -> PlatformCapabilities {
+    #[cfg(target_os = "linux")]
+    {
+        let desktop_environment = std::env::var("XDG_CURRENT_DESKTOP")
+            .or_else(|_| std::env::var("DESKTOP_SESSION"))
+            .unwrap_or_default();
+        let display_server = linux_display_server(
+            std::env::var("XDG_SESSION_TYPE").ok().as_deref(),
+            std::env::var("WAYLAND_DISPLAY").ok().as_deref(),
+            std::env::var("DISPLAY").ok().as_deref(),
+        )
+        .to_string();
+        let desktop_name = desktop_environment.to_ascii_lowercase();
+        return PlatformCapabilities {
+            os: "linux",
+            is_kylin: desktop_name.contains("ukui") || desktop_name.contains("kylin"),
+            desktop_environment,
+            precise_window_positioning: display_server != "wayland",
+            display_server,
+            native_widget: false,
+        };
+    }
+
+    #[cfg(target_os = "macos")]
+    return PlatformCapabilities {
+        os: "macos",
+        desktop_environment: "Aqua".into(),
+        display_server: "quartz".into(),
+        is_kylin: false,
+        native_widget: true,
+        precise_window_positioning: true,
+    };
+
+    #[cfg(target_os = "windows")]
+    return PlatformCapabilities {
+        os: "windows",
+        desktop_environment: "Windows".into(),
+        display_server: "win32".into(),
+        is_kylin: false,
+        native_widget: false,
+        precise_window_positioning: true,
+    };
 }
 
 fn schedule_window_state_save(window: &tauri::Window) {
@@ -349,6 +424,7 @@ pub fn run() {
             Some(vec!["--silent"]),
         ))
         .invoke_handler(tauri::generate_handler![
+            get_platform_capabilities,
             list_items,
             upsert_item,
             delete_item,
@@ -548,5 +624,15 @@ mod tests {
     #[test]
     fn oversized_window_is_anchored_to_work_area_origin() {
         assert_eq!(clamp_axis(500, 100, 800, 1200), 100);
+    }
+
+    #[test]
+    fn linux_display_server_prefers_wayland_when_both_are_available() {
+        assert_eq!(
+            linux_display_server(Some("wayland"), Some("wayland-0"), Some(":0")),
+            "wayland"
+        );
+        assert_eq!(linux_display_server(Some("x11"), None, Some(":0")), "x11");
+        assert_eq!(linux_display_server(None, None, None), "unknown");
     }
 }

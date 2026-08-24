@@ -1,5 +1,5 @@
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "PingFang SC", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "PingFang SC", "Noto Sans CJK SC", "Source Han Sans SC", sans-serif;
   color: #1d1d1f;
   background: transparent;
   font-synthesis: none;
@@ -57,6 +57,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   pointer-events: none;
   border-radius: inherit;
   background: linear-gradient(135deg, rgba(255,255,255,.34), transparent 35%);
+}
+.app-shell.platform-linux {
+  background-color: rgba(246, 247, 250, .96);
+  font-family: "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .app-shell { background-color: rgba(246, 247, 250, .98); }
+  .app-menu { background-color: rgba(255, 255, 255, .98); }
 }
 .app-shell.dragging { opacity: .7; cursor: grabbing; }
 .app-shell.expanded { padding: 28px; grid-template-columns: var(--sidebar-width, 286px) minmax(0, 1fr); grid-template-rows: auto auto 1fr; gap: 0 30px; }
@@ -154,6 +162,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .opacity-setting > span { margin-bottom: 5px; color: var(--text-secondary); font-size: 9.5px; display: flex; justify-content: space-between; }
 .opacity-setting output { color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .opacity-setting input { width: 100%; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.platform-note { display: block; margin: 3px 7px 5px; padding: 6px 7px; border-radius: 7px; font-size: 8.5px; line-height: 1.45; }
+.platform-note.compatible { color: #22733e; background: rgba(52, 199, 89, .1); }
+.platform-note.limited { color: #875b12; background: rgba(255, 159, 10, .12); }
 .menu-divider { height: .5px; margin: 4px 7px; background: var(--separator); }
 .menu-footnote { display: block; margin-top: 3px; padding: 7px 8px 4px; border-top: .5px solid var(--separator); color: var(--text-muted); font-size: 9px; }
 .desktop-widget { box-shadow: 0 12px 36px rgba(20,28,45,.1), inset 0 .5px rgba(255,255,255,.9); }

@@ -12,6 +12,7 @@ describe("App", () => {
     expect(container.querySelectorAll(".calendar-grid button")).toHaveLength(7);
     expect(container.querySelector(".app-glyph")).toHaveAttribute("src", expect.stringContaining("app-icon"));
     expect(container.querySelectorAll(".window-resize-handle")).toHaveLength(8);
+    expect(container.querySelector("main")).toHaveClass("platform-web");
   });
   it("可以切换为完整月视图并分别保存偏好", async () => {
     const user = userEvent.setup();

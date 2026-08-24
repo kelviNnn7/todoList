@@ -13,6 +13,16 @@ import appIcon from "./assets/app-icon.png";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 type ResizeDirection = "East" | "North" | "NorthEast" | "NorthWest" | "South" | "SouthEast" | "SouthWest" | "West";
+type PlatformCapabilities = {
+  os: "linux" | "macos" | "windows" | "web";
+  desktopEnvironment: string;
+  displayServer: string;
+  isKylin: boolean;
+  nativeWidget: boolean;
+  preciseWindowPositioning: boolean;
+};
+
+const defaultPlatform: PlatformCapabilities = { os: "web", desktopEnvironment: "", displayServer: "browser", isKylin: false, nativeWidget: false, preciseWindowPositioning: true };
 
 const isTauri = () => "__TAURI_INTERNALS__" in window;
 const savedOpacity = () => {
@@ -52,6 +62,7 @@ export default function App() {
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(savedSidebarWidth);
   const [panelResizing, setPanelResizing] = useState(false);
+  const [platform, setPlatform] = useState<PlatformCapabilities>(defaultPlatform);
   const importInput = useRef<HTMLInputElement>(null);
   const itemsRef = useRef(items);
   const panelResizeStart = useRef({ x: 0, width: 286 });
@@ -59,6 +70,13 @@ export default function App() {
 
   useEffect(() => { itemsRef.current = items; }, [items]);
   useEffect(() => { loadItems().then(setItems).finally(() => setLoading(false)); }, []);
+  useEffect(() => {
+    if (!isTauri()) return;
+    import("@tauri-apps/api/core")
+      .then(({ invoke }) => invoke<PlatformCapabilities>("get_platform_capabilities"))
+      .then(setPlatform)
+      .catch(() => undefined);
+  }, []);
   useEffect(() => {
     if (!isTauri()) return;
     import("@tauri-apps/plugin-autostart").then(({ isEnabled }) => isEnabled().then(setAutostart)).catch(() => setAutostart(false));
@@ -191,7 +209,9 @@ export default function App() {
   async function toggleDesktopWidget() {
     const next = !desktopWidget; setDesktopWidget(next); localStorage.setItem("pindo.desktopWidget", String(next));
     if (next && expandedWindow) { setExpandedWindow(false); setViewMode(savedView(false)); if (isTauri()) { const { invoke } = await import("@tauri-apps/api/core"); await invoke("set_window_mode", { expanded: false }); } }
-    setNotice(next ? "已切换为桌面小组件" : "已恢复普通窗口模式"); window.setTimeout(() => setNotice(""), 2200);
+    const waylandLimited = next && platform.os === "linux" && !platform.preciseWindowPositioning;
+    setNotice(waylandLimited ? "已启用挂件；Wayland 下位置与层级由桌面系统管理" : next ? "已切换为桌面小组件" : "已恢复普通窗口模式");
+    window.setTimeout(() => setNotice(""), waylandLimited ? 4200 : 2200);
   }
   function updateAppearanceOpacity(value: number) { const next = Math.min(100, Math.max(55, value)); setAppearanceOpacity(next); localStorage.setItem("pindo.appearanceOpacity", String(next)); }
   async function importIcsFile(file: File | undefined) {
@@ -229,13 +249,13 @@ export default function App() {
     });
   }
 
-  return <main className={`app-shell ${expandedWindow ? "expanded" : ""} ${desktopWidget ? "desktop-widget" : ""} ${locked ? "position-locked" : ""} ${dragging ? "dragging" : ""} ${panelResizing ? "panel-resizing" : ""}`} style={{ "--widget-opacity": appearanceOpacity / 100, "--sidebar-width": `${sidebarWidth}px` } as React.CSSProperties}>
+  return <main className={`app-shell platform-${platform.os} ${platform.isKylin ? "platform-kylin" : ""} ${expandedWindow ? "expanded" : ""} ${desktopWidget ? "desktop-widget" : ""} ${locked ? "position-locked" : ""} ${dragging ? "dragging" : ""} ${panelResizing ? "panel-resizing" : ""}`} style={{ "--widget-opacity": appearanceOpacity / 100, "--sidebar-width": `${sidebarWidth}px` } as React.CSSProperties}>
     {resizeDirections.map((direction) => <div key={direction} className={`window-resize-handle resize-${direction.toLowerCase()}`} aria-hidden="true" onPointerDown={(event) => startWindowResize(direction, event)}/>)}
     <div className="drag-region" onMouseDown={startWindowDrag}/>
     <header className="topbar" onMouseDown={startWindowDrag}>
       <div className="date-heading"><span className="brand-line"><img className="app-glyph" src={appIcon} alt=""/>BluNote</span><h1>{longDate(new Date())}</h1></div>
       <div className="top-actions"><button className="icon-button" aria-label={locked ? "解锁位置" : "锁定位置"} title={locked ? "解锁位置" : "锁定位置"} onClick={toggleLock}>{locked ? <Lock size={17}/> : <Unlock size={17}/>}</button><button className="icon-button" aria-label={expandedWindow ? "收起挂件" : "展开窗口"} title={expandedWindow ? "收起挂件" : "展开窗口"} onClick={toggleWindow}>{expandedWindow ? <Minimize2 size={17}/> : <Expand size={17}/>}</button><button className={`icon-button ${menuOpen ? "pressed" : ""}`} aria-label="更多选项" title="更多选项" aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}><Ellipsis size={19}/></button><span className="toolbar-divider" aria-hidden="true"/><button className="add-button" onClick={() => setFormType(filter === "meeting" ? "meeting" : "task")} aria-label="新增事项"><Plus size={19}/></button>
-        {menuOpen && <div className="app-menu" role="dialog" aria-label="更多设置"><span className="menu-title">小组件</span><label className="menu-setting"><span><strong>桌面小组件</strong><small>驻留桌面，不遮挡其他窗口</small></span><input type="checkbox" checked={desktopWidget} onChange={() => void toggleDesktopWidget()}/><i aria-hidden="true"/></label><label className="menu-setting"><span><strong>锁定位置</strong><small>防止意外拖动挂件</small></span><input type="checkbox" checked={locked} onChange={() => void toggleLock()}/><i aria-hidden="true"/></label><label className="menu-setting"><span><strong>边缘吸附</strong><small>靠近屏幕边缘 8px 自动贴合</small></span><input type="checkbox" checked={edgeSnap} onChange={toggleEdgeSnap}/><i aria-hidden="true"/></label><label className="opacity-setting"><span>外观透明度<output>{appearanceOpacity}%</output></span><input aria-label="外观透明度" type="range" min="55" max="100" step="5" value={appearanceOpacity} onChange={(event) => updateAppearanceOpacity(Number(event.target.value))}/></label><div className="menu-divider"/><button onClick={() => importInput.current?.click()}>导入 ICS 日历</button><button onClick={() => void toggleAutostart()}>开机自启：{autostart ? "开" : "关"}</button><small className="menu-footnote">设置与数据仅保存在本机</small></div>}
+        {menuOpen && <div className="app-menu" role="dialog" aria-label="更多设置"><span className="menu-title">小组件</span><label className="menu-setting"><span><strong>桌面小组件</strong><small>驻留桌面，不遮挡其他窗口</small></span><input type="checkbox" checked={desktopWidget} onChange={() => void toggleDesktopWidget()}/><i aria-hidden="true"/></label><label className="menu-setting"><span><strong>锁定位置</strong><small>防止意外拖动挂件</small></span><input type="checkbox" checked={locked} onChange={() => void toggleLock()}/><i aria-hidden="true"/></label><label className="menu-setting"><span><strong>边缘吸附</strong><small>靠近屏幕边缘 8px 自动贴合</small></span><input type="checkbox" checked={edgeSnap} onChange={toggleEdgeSnap}/><i aria-hidden="true"/></label><label className="opacity-setting"><span>外观透明度<output>{appearanceOpacity}%</output></span><input aria-label="外观透明度" type="range" min="55" max="100" step="5" value={appearanceOpacity} onChange={(event) => updateAppearanceOpacity(Number(event.target.value))}/></label>{platform.os === "linux" && <small className={`platform-note ${platform.preciseWindowPositioning ? "compatible" : "limited"}`}>{platform.preciseWindowPositioning ? `麒麟 ${platform.displayServer.toUpperCase()}：完整桌面挂件模式` : "麒麟 Wayland：窗口位置与层级由系统管理，推荐使用 X11 会话"}</small>}<div className="menu-divider"/><button onClick={() => importInput.current?.click()}>导入 ICS 日历</button><button onClick={() => void toggleAutostart()}>开机自启：{autostart ? "开" : "关"}</button><small className="menu-footnote">设置与数据仅保存在本机</small></div>}
         <input ref={importInput} className="visually-hidden" type="file" accept=".ics,text/calendar" onChange={(event) => void importIcsFile(event.target.files?.[0])}/>
       </div>
     </header>
