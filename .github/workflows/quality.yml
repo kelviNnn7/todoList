@@ -77,7 +77,7 @@ jobs:
           components: rustfmt, clippy
       - run: npm ci
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
-      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+      - run: bash scripts/ci-rust-check.sh
       - run: cargo test --manifest-path src-tauri/Cargo.toml
       - run: npm run build:kylin
       - name: Validate Debian metadata
