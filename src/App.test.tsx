@@ -57,4 +57,13 @@ describe("App", () => {
     expect(separator).toHaveAttribute("aria-valuenow", "380");
     expect(localStorage.getItem("pindo.sidebarWidth")).toBe("380");
   });
+  it("展开窗口后待办列表保持为可滚动且可键盘访问的主区域", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App/>);
+    await user.click(screen.getByRole("button", { name: "展开窗口" }));
+    expect(container.querySelector("main")).toHaveClass("expanded");
+    expect(screen.getByRole("region", { name: /待办列表/ })).toHaveAttribute("tabindex", "0");
+    expect(container.querySelector(".agenda")).toBeInTheDocument();
+    expect(container.querySelector(".calendar-panel")).toBeInTheDocument();
+  });
 });
