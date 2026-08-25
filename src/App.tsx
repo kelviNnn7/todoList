@@ -65,7 +65,7 @@ export default function App() {
   }, []);
   useEffect(() => {
     if (!panelResizing) return;
-    const resize = (event: PointerEvent) => setSidebarWidth(clampSidebarWidth(panelResizeStart.current.width + event.clientX - panelResizeStart.current.x));
+    const resize = (event: PointerEvent) => setSidebarWidth(clampSidebarWidth(panelResizeStart.current.width - (event.clientX - panelResizeStart.current.x)));
     const finish = () => {
       setPanelResizing(false);
       setSidebarWidth((width) => {
@@ -223,7 +223,7 @@ export default function App() {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     event.preventDefault();
     setSidebarWidth((width) => {
-      const next = clampSidebarWidth(width + (event.key === "ArrowLeft" ? -10 : 10));
+      const next = clampSidebarWidth(width + (event.key === "ArrowLeft" ? 10 : -10));
       localStorage.setItem("pindo.sidebarWidth", String(next));
       return next;
     });

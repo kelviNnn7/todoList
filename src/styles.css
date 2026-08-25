@@ -59,7 +59,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   background: linear-gradient(135deg, rgba(255,255,255,.34), transparent 35%);
 }
 .app-shell.dragging { opacity: .7; cursor: grabbing; }
-.app-shell.expanded { padding: 28px; grid-template-columns: var(--sidebar-width, 286px) minmax(0, 1fr); grid-template-rows: auto auto 1fr; gap: 0 30px; }
+.app-shell.expanded { padding: 28px; grid-template-columns: minmax(0, 1fr) var(--sidebar-width, 286px); grid-template-rows: auto auto 1fr; gap: 0 30px; }
 .drag-region { position: absolute; z-index: 2; top: 0; left: 44px; right: 44px; height: 14px; cursor: grab; }
 .topbar { cursor: grab; }
 .position-locked .drag-region, .position-locked .topbar { cursor: default; }
@@ -275,19 +275,19 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .button:disabled { opacity: .55; cursor: wait; }
 
 .expanded .topbar { grid-column: 1 / 3; }
-.panel-resizer { position: absolute; z-index: 8; top: 82px; bottom: 28px; left: calc(28px + var(--sidebar-width, 286px) + 11px); width: 8px; border-radius: 4px; cursor: col-resize; touch-action: none; display: grid; place-items: center; }
+.panel-resizer { position: absolute; z-index: 8; top: 82px; right: calc(28px + var(--sidebar-width, 286px) + 11px); bottom: 28px; width: 8px; border-radius: 4px; cursor: col-resize; touch-action: none; display: grid; place-items: center; }
 .panel-resizer span { width: 2px; height: 42px; border-radius: 2px; background: var(--separator-strong); opacity: .35; transition: opacity .15s ease, background-color .15s ease; }
 .panel-resizer:hover span, .panel-resizer:focus-visible span, .panel-resizing .panel-resizer span { background: var(--accent); opacity: .8; }
 .panel-resizer:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .panel-resizing { cursor: col-resize; user-select: none; }
-.expanded .filters { grid-column: 1; grid-row: 2; align-self: start; grid-template-columns: 1fr; margin-top: 24px; padding: 6px; border: .5px solid var(--separator); background: var(--material); }
+.expanded .filters { grid-column: 2; grid-row: 2; align-self: start; grid-template-columns: 1fr; margin-top: 24px; padding: 6px; border: .5px solid var(--separator); background: var(--material); }
 .expanded .filters button { height: 35px; justify-content: flex-start; padding: 0 11px; }
 .expanded .filters button span { margin-left: auto; }
-.expanded .calendar-panel { grid-column: 1; grid-row: 3; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-top: 14px; border: 0; scrollbar-width: thin; scrollbar-color: rgba(100,115,140,.2) transparent; }
+.expanded .calendar-panel { grid-column: 2; grid-row: 3; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-top: 14px; border: 0; scrollbar-width: thin; scrollbar-color: rgba(100,115,140,.2) transparent; }
 .expanded .calendar-grid { gap: 3px 2px; }
 .expanded .calendar-grid button { height: 40px; }
 .expanded .calendar-panel.month .calendar-grid button { height: 32px; }
-.expanded .agenda { grid-column: 2; grid-row: 2 / 4; min-height: 0; overflow: hidden; padding-top: 22px; }
+.expanded .agenda { grid-column: 1; grid-row: 2 / 4; min-height: 0; overflow: hidden; padding-top: 22px; }
 .expanded .item-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: max-content; gap: 8px; align-content: start; }
 .expanded .item-card { margin-bottom: 0; }
 .expanded .empty-state { grid-column: 1 / -1; min-height: 112px; }

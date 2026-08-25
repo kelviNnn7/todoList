@@ -44,14 +44,14 @@ describe("App", () => {
     render(<App/>);
     await user.click(screen.getByRole("button", { name: "展开窗口" }));
     const separator = screen.getByRole("separator", { name: "调整侧栏宽度" });
-    fireEvent.keyDown(separator, { key: "ArrowRight" });
+    fireEvent.keyDown(separator, { key: "ArrowLeft" });
     expect(separator).toHaveAttribute("aria-valuenow", "296");
     expect(localStorage.getItem("pindo.sidebarWidth")).toBe("296");
     const pointerDown = new Event("pointerdown", { bubbles: true });
     Object.defineProperty(pointerDown, "clientX", { value: 100 });
     fireEvent(separator, pointerDown);
     const pointerMove = new Event("pointermove", { bubbles: true });
-    Object.defineProperty(pointerMove, "clientX", { value: 1000 });
+    Object.defineProperty(pointerMove, "clientX", { value: -1000 });
     fireEvent(window, pointerMove);
     fireEvent.pointerUp(window);
     expect(separator).toHaveAttribute("aria-valuenow", "380");
