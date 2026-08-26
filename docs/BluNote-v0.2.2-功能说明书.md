@@ -168,8 +168,8 @@ BluNote 是一个本地优先的轻量桌面任务与会议挂件。它用可常
 - 小尺寸最多 3 个任务，中尺寸最多 5 个任务。
 - 没有事项时显示“今天没有待办”。
 - 每 60 秒生成一次时间线刷新计划。
-- 点击小组件通过 `pindo://today` 打开主应用并定位到今天。
-- 通过 App Group `group.com.pindo.desktop` 读取原子写入的 `todo-widget.json`。
+- 点击小组件通过 `todo-widget://today` 打开主应用并定位到今天。
+- 通过 App Group `group.com.todo.desktop` 读取原子写入的 `todo-widget.json`。
 
 该功能只适用于 macOS；Windows 在当前版本没有操作系统原生小组件。
 
@@ -191,24 +191,23 @@ BluNote 是一个本地优先的轻量桌面任务与会议挂件。它用可常
 
 ### 5.2 数据库
 
-- 文件：操作系统应用数据目录下的 `pindo.db`。
+- 文件：操作系统应用数据目录下的 `todo.db`。
 - 主键：事项 ID。
 - 写入：使用 UPSERT，创建与更新共用同一接口。
 - 数据库版本：`user_version = 2`。
 - v1 → v2 迁移会保留旧 payload 并补充提醒字段。
-- 浏览器测试/预览环境使用 `localStorage` 的 `pindo.items.v1` 作为回退。
+- 浏览器测试/预览环境使用 `localStorage` 的 `todo.items.v1` 作为回退。
 
 ### 5.3 本地偏好键
 
 | 键 | 用途 |
 |---|---|
-| `pindo.appearanceOpacity` | 外观透明度 |
-| `pindo.calendarView.widget` | 挂件日历视图 |
-| `pindo.calendarView.expanded` | 展开模式日历视图 |
-| `pindo.positionLocked` | 位置锁定 |
-| `pindo.edgeSnap` | 边缘吸附 |
-| `pindo.desktopWidget` | 桌面小组件模式 |
-| `pindo.sidebarWidth` | 展开模式侧栏宽度 |
+| `todo.appearanceOpacity` | 外观透明度 |
+| `todo.calendarView.widget` | 挂件日历视图 |
+| `todo.calendarView.expanded` | 展开模式日历视图 |
+| `todo.positionLocked` | 位置锁定 |
+| `todo.edgeSnap` | 边缘吸附 |
+| `todo.desktopWidget` | 桌面小组件模式 |
 
 ## 6. 技术架构
 
@@ -220,7 +219,7 @@ flowchart LR
   CORE --> OS["窗口、托盘、自启、通知"]
   DB --> SNAP["macOS App Group JSON 快照"]
   SNAP --> WIDGET["WidgetKit 小组件"]
-  WIDGET -->|"pindo://today"| UI
+  WIDGET -->|"todo-widget://today"| UI
 ```
 
 | 层 | 技术 |
@@ -262,7 +261,6 @@ flowchart LR
 | 中 | ICS 时区和订阅能力有限 | 复杂日历可能产生时间偏差，不能自动同步 |
 | 中 | 开机自启静默参数未闭环 | 登录后可能意外显示窗口 |
 | 中 | Windows 无原生系统小组件 | 与 macOS 平台能力不一致 |
-| 低 | 内部标识仍使用 `pindo` | 品牌技术债，不影响当前显示名称 |
 
 ## 10. 发布状态
 

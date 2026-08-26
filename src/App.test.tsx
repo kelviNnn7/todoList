@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import App from "./App";
+import { scopedStorageKey } from "./lib/scopedStorage";
 
 describe("App", () => {
   beforeEach(() => localStorage.clear());
@@ -18,7 +19,7 @@ describe("App", () => {
     const { container } = render(<App/>);
     await user.click(screen.getByRole("button", { name: "月" }));
     expect(container.querySelectorAll(".calendar-grid button").length).toBeGreaterThanOrEqual(35);
-    expect(localStorage.getItem("pindo.calendarView.widget")).toBe("month");
+    expect(localStorage.getItem(scopedStorageKey("calendarView.widget"))).toBe("month");
   });
   it("可以打开新增会议表单并校验", async () => {
     const user = userEvent.setup(); render(<App/>);
@@ -36,8 +37,8 @@ describe("App", () => {
     fireEvent.change(screen.getByRole("slider", { name: "外观透明度" }), { target: { value: "75" } });
     expect(container.querySelector("main")).toHaveClass("desktop-widget");
     expect(container.querySelector("main")).toHaveAttribute("style", expect.stringContaining("--widget-opacity: 0.75"));
-    expect(localStorage.getItem("pindo.desktopWidget")).toBe("true");
-    expect(localStorage.getItem("pindo.appearanceOpacity")).toBe("75");
+    expect(localStorage.getItem(scopedStorageKey("desktopWidget"))).toBe("true");
+    expect(localStorage.getItem(scopedStorageKey("appearanceOpacity"))).toBe("75");
   });
   it("展开窗口后待办与日历固定为等宽双栏", async () => {
     const user = userEvent.setup();
@@ -45,7 +46,7 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "展开窗口" }));
     expect(container.querySelector("main")).toHaveClass("expanded");
     expect(screen.queryByRole("separator", { name: "调整侧栏宽度" })).not.toBeInTheDocument();
-    expect(localStorage.getItem("pindo.sidebarWidth")).toBeNull();
+    expect(localStorage.getItem(scopedStorageKey("sidebarWidth"))).toBeNull();
   });
   it("展开窗口后待办列表保持为可滚动且可键盘访问的主区域", async () => {
     const user = userEvent.setup();

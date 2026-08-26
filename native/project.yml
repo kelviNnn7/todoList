@@ -1,4 +1,4 @@
-name: PindoNative
+name: DesktopWidgets
 options:
   deploymentTarget:
     macOS: "13.0"
@@ -7,35 +7,35 @@ settings:
     SWIFT_VERSION: "5.0"
     MACOSX_DEPLOYMENT_TARGET: "13.0"
 targets:
-  PindoWidget:
+  TaskWidget:
     type: app-extension
     platform: macOS
     sources:
-      - path: PindoWidget
+      - path: TaskWidget
         excludes:
           - Info.plist
-          - PindoWidget.entitlements
+          - TaskWidget.entitlements
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.pindo.desktop.widget
-        PRODUCT_NAME: PindoWidget
-        INFOPLIST_FILE: PindoWidget/Info.plist
-        CODE_SIGN_ENTITLEMENTS: PindoWidget/PindoWidget.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.todo.desktop.widget
+        PRODUCT_NAME: TaskWidget
+        INFOPLIST_FILE: TaskWidget/Info.plist
+        CODE_SIGN_ENTITLEMENTS: TaskWidget/TaskWidget.entitlements
         GENERATE_INFOPLIST_FILE: NO
         SKIP_INSTALL: YES
-  PindoWidgetReloader:
+  WidgetReloader:
     type: tool
     platform: macOS
     sources:
-      - path: PindoWidgetReloader
+      - path: WidgetReloader
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.pindo.desktop.widget-reloader
-        PRODUCT_NAME: PindoWidgetReloader
+        PRODUCT_BUNDLE_IDENTIFIER: com.todo.desktop.widget-reloader
+        PRODUCT_NAME: WidgetReloader
         GENERATE_INFOPLIST_FILE: YES
 schemes:
-  PindoNative:
+  DesktopWidgets:
     build:
       targets:
-        PindoWidget: all
-        PindoWidgetReloader: all
+        TaskWidget: all
+        WidgetReloader: all

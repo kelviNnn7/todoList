@@ -1,6 +1,7 @@
 import type { TodoItem } from "../types";
+import { readScopedValue, writeScopedValue } from "./scopedStorage";
 
-const FALLBACK_KEY = "pindo.items.v1";
+const FALLBACK_ENTRY = "items.v1";
 
 const inTauri = () => "__TAURI_INTERNALS__" in window;
 
@@ -25,7 +26,7 @@ export async function loadItems(): Promise<TodoItem[]> {
     const rows = await invoke<string[]>("list_items");
     return rows.map(safeParse).filter((item): item is TodoItem => item !== null);
   }
-  return (safeParseArray(localStorage.getItem(FALLBACK_KEY)) ?? []);
+  return (safeParseArray(readScopedValue(FALLBACK_ENTRY)) ?? []);
 }
 
 function safeParseArray(payload: string | null): TodoItem[] | null {
@@ -45,11 +46,11 @@ export async function saveItem(item: TodoItem): Promise<void> {
   }
   const items = await loadItems();
   const next = items.filter((current) => current.id !== item.id);
-  localStorage.setItem(FALLBACK_KEY, JSON.stringify([item, ...next]));
+  writeScopedValue(FALLBACK_ENTRY, JSON.stringify([item, ...next]));
 }
 
 export async function deleteItem(id: string): Promise<void> {
   if (inTauri()) { const { invoke } = await import("@tauri-apps/api/core"); await invoke("delete_item", { id }); return; }
   const items = await loadItems();
-  localStorage.setItem(FALLBACK_KEY, JSON.stringify(items.filter((item) => item.id !== id)));
+  writeScopedValue(FALLBACK_ENTRY, JSON.stringify(items.filter((item) => item.id !== id)));
 }

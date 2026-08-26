@@ -155,14 +155,21 @@ bash scripts/build-macos-dmg.sh
 ## 数据与隐私
 
 - 无账号、云同步或内置遥测。
-- 事项保存在系统应用数据目录的 `pindo.db`。
+- 事项保存在系统应用数据目录的 `todo.db`。
 - 数据库使用参数绑定，事项 JSON 长度限制为 65,535 字节。
 - ICS 文件只在本机解析，不上传文件内容。
 - 会议链接只接受 HTTP/HTTPS 协议。
 - Content Security Policy 禁止加载任意远程脚本。
-- WidgetKit 只通过 `group.com.pindo.desktop` App Group 读取本地快照。
+- WidgetKit 只通过 `group.com.todo.desktop` App Group 读取本地快照。
 
-卸载应用前如需保留数据，请先备份系统应用数据目录中的 `pindo.db`。
+卸载应用前如需保留数据，请先备份系统应用数据目录中的 `todo.db`。
+
+## 代码命名规范
+
+- 源码标识符、包名、文件名、目录名、数据库名和系统协议名必须按职责命名，不得包含具体 App 或产品品牌名称。
+- 产品名称只允许出现在用户可见文案、安装包展示信息和产品文档中。
+- 兼容历史版本所需的旧值必须封装在独立迁移逻辑中，不得扩散到业务代码。
+- 新增模块优先采用 `task`、`calendar`、`widget`、`storage` 等领域或职责词汇。
 
 ## 分支约定
 

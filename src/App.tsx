@@ -8,6 +8,7 @@ import { dateKey, itemDate, itemsForDate, longDate, monthDays, sortItems, weekDa
 import { parseIcs } from "./lib/ics";
 import { isTaskReminderDue, markReminderFired, quickSnoozeAt, snoozeTask, type QuickSnooze } from "./lib/reminders";
 import { deleteItem, loadItems, saveItem } from "./lib/storage";
+import { readScopedValue, writeScopedValue } from "./lib/scopedStorage";
 import type { CalendarViewMode, FilterType, ItemType, TodoItem } from "./types";
 import appIcon from "./assets/app-icon.png";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -16,11 +17,11 @@ type ResizeDirection = "East" | "North" | "NorthEast" | "NorthWest" | "South" | 
 
 const isTauri = () => "__TAURI_INTERNALS__" in window;
 const savedOpacity = () => {
-  const value = Number(localStorage.getItem("pindo.appearanceOpacity"));
+  const value = Number(readScopedValue("appearanceOpacity"));
   return Number.isFinite(value) && value >= 55 && value <= 100 ? Math.round(value / 5) * 5 : 95;
 };
 const savedView = (expanded: boolean): CalendarViewMode => {
-  const value = localStorage.getItem(`pindo.calendarView.${expanded ? "expanded" : "widget"}`);
+  const value = readScopedValue(`calendarView.${expanded ? "expanded" : "widget"}`);
   return value === "week" || value === "month" ? value : expanded ? "month" : "week";
 };
 const resizeDirections: ResizeDirection[] = ["North", "NorthEast", "East", "SouthEast", "South", "SouthWest", "West", "NorthWest"];
@@ -34,11 +35,11 @@ export default function App() {
   const [editingItem, setEditingItem] = useState<TodoItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedWindow, setExpandedWindow] = useState(false);
-  const [locked, setLocked] = useState(() => localStorage.getItem("pindo.positionLocked") === "true");
-  const [edgeSnap, setEdgeSnap] = useState(() => localStorage.getItem("pindo.edgeSnap") !== "false");
+  const [locked, setLocked] = useState(() => readScopedValue("positionLocked") === "true");
+  const [edgeSnap, setEdgeSnap] = useState(() => readScopedValue("edgeSnap") !== "false");
   const [dragging, setDragging] = useState(false);
   const [autostart, setAutostart] = useState(false);
-  const [desktopWidget, setDesktopWidget] = useState(() => localStorage.getItem("pindo.desktopWidget") === "true");
+  const [desktopWidget, setDesktopWidget] = useState(() => readScopedValue("desktopWidget") === "true");
   const [appearanceOpacity, setAppearanceOpacity] = useState(savedOpacity);
   const [menuOpen, setMenuOpen] = useState(false);
   const [notice, setNotice] = useState("");
@@ -78,7 +79,7 @@ export default function App() {
     if (!isTauri()) return;
     let unlisten: (() => void) | undefined;
     import("@tauri-apps/api/event").then(({ listen }) => listen<string>("deep-link", ({ payload }) => {
-      if (payload.startsWith("pindo://today")) { const today = new Date(); setSelectedDate(today); setCalendarAnchor(today); }
+      if (payload.endsWith("://today")) { const today = new Date(); setSelectedDate(today); setCalendarAnchor(today); }
     })).then((dispose) => { unlisten = dispose; }).catch(() => undefined);
     return () => unlisten?.();
   }, []);
@@ -86,7 +87,7 @@ export default function App() {
     if (!isTauri()) return;
     let unlisten: (() => void) | undefined;
     import("@tauri-apps/api/event").then(({ listen }) => listen<boolean>("position-lock-changed", ({ payload }) => {
-      setLocked(payload); localStorage.setItem("pindo.positionLocked", String(payload));
+      setLocked(payload); writeScopedValue("positionLocked", String(payload));
     })).then((dispose) => { unlisten = dispose; }).catch(() => undefined);
     return () => unlisten?.();
   }, []);
@@ -148,26 +149,26 @@ export default function App() {
   function openCreate(type: ItemType) { setEditingItem(null); setFormType(type); }
   function openEdit(item: TodoItem) { setEditingItem(item); setFormType(item.type); }
   function closeForm() { setFormType(null); setEditingItem(null); }
-  function chooseView(next: CalendarViewMode) { setViewMode(next); setCalendarAnchor(selectedDate); localStorage.setItem(`pindo.calendarView.${expandedWindow ? "expanded" : "widget"}`, next); }
+  function chooseView(next: CalendarViewMode) { setViewMode(next); setCalendarAnchor(selectedDate); writeScopedValue(`calendarView.${expandedWindow ? "expanded" : "widget"}`, next); }
   async function toggleWindow() {
     const next = !expandedWindow; setExpandedWindow(next); setViewMode(savedView(next)); setCalendarAnchor(selectedDate);
     if (isTauri()) { const { invoke } = await import("@tauri-apps/api/core"); await invoke("set_window_mode", { expanded: next }); }
   }
   function toggleLock() {
-    const next = !locked; setLocked(next); localStorage.setItem("pindo.positionLocked", String(next));
+    const next = !locked; setLocked(next); writeScopedValue("positionLocked", String(next));
   }
-  function toggleEdgeSnap() { const next = !edgeSnap; setEdgeSnap(next); localStorage.setItem("pindo.edgeSnap", String(next)); }
+  function toggleEdgeSnap() { const next = !edgeSnap; setEdgeSnap(next); writeScopedValue("edgeSnap", String(next)); }
   async function toggleAutostart() {
     if (!isTauri()) { setNotice("开机自启仅在桌面应用中可用"); return; }
     const plugin = await import("@tauri-apps/plugin-autostart"); if (autostart) await plugin.disable(); else await plugin.enable();
     setAutostart(!autostart); setNotice(`开机自启已${autostart ? "关闭" : "开启"}`); setMenuOpen(false); window.setTimeout(() => setNotice(""), 2500);
   }
   async function toggleDesktopWidget() {
-    const next = !desktopWidget; setDesktopWidget(next); localStorage.setItem("pindo.desktopWidget", String(next));
+    const next = !desktopWidget; setDesktopWidget(next); writeScopedValue("desktopWidget", String(next));
     if (next && expandedWindow) { setExpandedWindow(false); setViewMode(savedView(false)); if (isTauri()) { const { invoke } = await import("@tauri-apps/api/core"); await invoke("set_window_mode", { expanded: false }); } }
     setNotice(next ? "已切换为桌面小组件" : "已恢复普通窗口模式"); window.setTimeout(() => setNotice(""), 2200);
   }
-  function updateAppearanceOpacity(value: number) { const next = Math.min(100, Math.max(55, value)); setAppearanceOpacity(next); localStorage.setItem("pindo.appearanceOpacity", String(next)); }
+  function updateAppearanceOpacity(value: number) { const next = Math.min(100, Math.max(55, value)); setAppearanceOpacity(next); writeScopedValue("appearanceOpacity", String(next)); }
   async function importIcsFile(file: File | undefined) {
     if (!file) return;
     try { const imported = parseIcs(await file.text()); for (const item of imported) await saveItem(item); setItems((current) => [...imported, ...current.filter((item) => !imported.some((value) => value.id === item.id))]); setNotice(`已导入 ${imported.length} 场会议`); }

@@ -29,7 +29,7 @@
 以下项目没有完成前，不应把构建标记为“生产正式版”：
 
 1. Apple Developer ID 签名与公证、Windows Authenticode 签名。
-2. Apple Developer 账号中注册 `group.com.pindo.desktop` App Group，并让主应用与 Widget 扩展使用同一 Team 签名。
+2. Apple Developer 账号中注册 `group.com.todo.desktop` App Group，并让主应用与 Widget 扩展使用同一 Team 签名。
 3. 三套目标系统的通知准时率长稳测试，至少覆盖睡眠唤醒、系统时区变更和应用隐藏状态。
 4. 多显示器热插拔后的窗口可见性恢复。
 5. EventKit 与 Outlook 账户直连（若继续纳入对外承诺）；当前仅支持 ICS。

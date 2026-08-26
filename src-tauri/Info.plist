@@ -3,7 +3,7 @@
 <plist version="1.0"><dict>
   <key>CFBundleURLTypes</key>
   <array><dict>
-    <key>CFBundleURLName</key><string>com.pindo.desktop</string>
-    <key>CFBundleURLSchemes</key><array><string>pindo</string></array>
+    <key>CFBundleURLName</key><string>com.todo.desktop</string>
+    <key>CFBundleURLSchemes</key><array><string>todo-widget</string></array>
   </dict></array>
 </dict></plist>

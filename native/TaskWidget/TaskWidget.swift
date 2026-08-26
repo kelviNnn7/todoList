@@ -1,7 +1,7 @@
 import SwiftUI
 import WidgetKit
 
-private let appGroup = "group.com.pindo.desktop"
+private let appGroup = "group.com.todo.desktop"
 
 struct SharedItem: Codable, Identifiable {
     let id: String
@@ -24,28 +24,28 @@ struct SharedSnapshot: Codable {
     static let empty = SharedSnapshot(opacity: 95, items: [])
 }
 
-struct PindoEntry: TimelineEntry {
+struct WidgetEntry: TimelineEntry {
     let date: Date
     let opacity: Double
     let tasks: [SharedItem]
     let meeting: SharedItem?
 }
 
-struct PindoProvider: TimelineProvider {
-    func placeholder(in context: Context) -> PindoEntry {
-        PindoEntry(date: Date(), opacity: 95, tasks: [SharedItem(id: "sample", type: "task", title: "完成今日计划", notes: nil, startAt: nil, dueAt: nil, completed: false)], meeting: nil)
+struct WidgetProvider: TimelineProvider {
+    func placeholder(in context: Context) -> WidgetEntry {
+        WidgetEntry(date: Date(), opacity: 95, tasks: [SharedItem(id: "sample", type: "task", title: "完成今日计划", notes: nil, startAt: nil, dueAt: nil, completed: false)], meeting: nil)
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (PindoEntry) -> Void) {
+    func getSnapshot(in context: Context, completion: @escaping (WidgetEntry) -> Void) {
         completion(entry())
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<PindoEntry>) -> Void) {
+    func getTimeline(in context: Context, completion: @escaping (Timeline<WidgetEntry>) -> Void) {
         let value = entry()
         completion(Timeline(entries: [value], policy: .after(Date().addingTimeInterval(60))))
     }
 
-    private func entry() -> PindoEntry {
+    private func entry() -> WidgetEntry {
         let snapshot = loadSnapshot()
         let calendar = Calendar.current
         let active = snapshot.items.filter { !$0.completed }
@@ -53,7 +53,7 @@ struct PindoProvider: TimelineProvider {
             .sorted { ($0.date ?? .distantFuture) < ($1.date ?? .distantFuture) }
         let meeting = active.filter { $0.type == "meeting" && ($0.date.map(calendar.isDateInToday) ?? false) }
             .sorted { ($0.date ?? .distantFuture) < ($1.date ?? .distantFuture) }.first
-        return PindoEntry(date: Date(), opacity: snapshot.opacity, tasks: tasks, meeting: meeting)
+        return WidgetEntry(date: Date(), opacity: snapshot.opacity, tasks: tasks, meeting: meeting)
     }
 
     private func loadSnapshot() -> SharedSnapshot {
@@ -64,9 +64,9 @@ struct PindoProvider: TimelineProvider {
     }
 }
 
-struct PindoWidgetView: View {
+struct WidgetContentView: View {
     @Environment(\.widgetFamily) private var family
-    let entry: PindoEntry
+    let entry: WidgetEntry
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -100,7 +100,7 @@ struct PindoWidgetView: View {
         }
         .padding(14)
         .opacity(entry.opacity / 100)
-        .widgetURL(URL(string: "pindo://today"))
+        .widgetURL(URL(string: "todo-widget://today"))
     }
 
     @ViewBuilder var body: some View {
@@ -113,10 +113,10 @@ struct PindoWidgetView: View {
 }
 
 @main
-struct PindoWidget: Widget {
-    let kind = "PindoWidget"
+struct TaskWidget: Widget {
+    let kind = "TaskWidget"
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: PindoProvider()) { entry in PindoWidgetView(entry: entry) }
+        StaticConfiguration(kind: kind, provider: WidgetProvider()) { entry in WidgetContentView(entry: entry) }
             .configurationDisplayName("BluNote · 今天")
             .description("查看今天的任务和最近会议。")
             .supportedFamilies([.systemSmall, .systemMedium])

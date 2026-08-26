@@ -16,16 +16,16 @@ fi
 npm run check
 npm run tauri build -- --bundles app
 xcodegen generate --spec native/project.yml --project native
-xcodebuild -project native/PindoNative.xcodeproj -scheme PindoNative -configuration Release -derivedDataPath native/build CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project native/DesktopWidgets.xcodeproj -scheme DesktopWidgets -configuration Release -derivedDataPath native/build CODE_SIGNING_ALLOWED=NO build
 
 app_path="src-tauri/target/release/bundle/macos/BluNote.app"
 products="native/build/Build/Products/Release"
 mkdir -p "$app_path/Contents/PlugIns"
-cp -R "$products/PindoWidget.appex" "$app_path/Contents/PlugIns/PindoWidget.appex"
-cp "$products/PindoWidgetReloader" "$app_path/Contents/MacOS/PindoWidgetReloader"
-chmod +x "$app_path/Contents/MacOS/PindoWidgetReloader"
-codesign --force --options runtime --sign - --entitlements native/PindoWidget/PindoWidget.entitlements "$app_path/Contents/PlugIns/PindoWidget.appex"
-codesign --force --options runtime --sign - "$app_path/Contents/MacOS/PindoWidgetReloader"
+cp -R "$products/TaskWidget.appex" "$app_path/Contents/PlugIns/TaskWidget.appex"
+cp "$products/WidgetReloader" "$app_path/Contents/MacOS/WidgetReloader"
+chmod +x "$app_path/Contents/MacOS/WidgetReloader"
+codesign --force --options runtime --sign - --entitlements native/TaskWidget/TaskWidget.entitlements "$app_path/Contents/PlugIns/TaskWidget.appex"
+codesign --force --options runtime --sign - "$app_path/Contents/MacOS/WidgetReloader"
 codesign --force --options runtime --sign - --entitlements src-tauri/entitlements.plist "$app_path"
 codesign --verify --deep --strict --verbose=2 "$app_path"
 

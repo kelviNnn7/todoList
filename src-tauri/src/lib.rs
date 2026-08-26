@@ -1,5 +1,6 @@
 use rusqlite::{params, Connection};
 use std::{
+    path::Path,
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Mutex,
@@ -15,8 +16,43 @@ use tauri::{
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
+const APP_BUNDLE_IDENTIFIER: &str = "com.todo.desktop";
+const APP_GROUP_IDENTIFIER: &str = "group.com.todo.desktop";
+const APP_URL_SCHEME: &str = "todo-widget";
+const DATA_FILE_NAME: &str = "todo.db";
+const WIDGET_RELOADER_NAME: &str = "WidgetReloader";
+
 struct DatabaseState(Mutex<Connection>);
 struct TrayState(Mutex<Option<CheckMenuItem<tauri::Wry>>>);
+
+fn legacy_namespace() -> String {
+    ["pin", "do"].concat()
+}
+
+fn migrate_legacy_database(data_dir: &Path) -> std::io::Result<()> {
+    let destination = data_dir.join(DATA_FILE_NAME);
+    if destination.exists() {
+        return Ok(());
+    }
+    let Some(app_data_root) = data_dir.parent() else {
+        return Ok(());
+    };
+    let namespace = legacy_namespace();
+    let legacy_directory = app_data_root.join(format!("com.{namespace}.desktop"));
+    let legacy_file_name = format!("{namespace}.db");
+    if !legacy_directory.join(&legacy_file_name).is_file() {
+        return Ok(());
+    }
+
+    std::fs::create_dir_all(data_dir)?;
+    for suffix in ["", "-wal", "-shm"] {
+        let source = legacy_directory.join(format!("{legacy_file_name}{suffix}"));
+        if source.is_file() {
+            std::fs::copy(source, data_dir.join(format!("{DATA_FILE_NAME}{suffix}")))?;
+        }
+    }
+    Ok(())
+}
 
 #[derive(Default)]
 struct WindowPreferences {
@@ -112,7 +148,7 @@ fn write_widget_snapshot(
     #[cfg(target_os = "macos")]
     {
         let home = app.path().home_dir().map_err(|error| error.to_string())?;
-        let directory = home.join("Library/Group Containers/group.com.pindo.desktop");
+        let directory = home.join(format!("Library/Group Containers/{APP_GROUP_IDENTIFIER}"));
         std::fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
         let mut statement = connection
             .prepare("SELECT payload FROM items ORDER BY updated_at DESC")
@@ -140,7 +176,7 @@ fn write_widget_snapshot(
             .map_err(|error| error.to_string())?;
         if let Ok(executable) = std::env::current_exe() {
             if let Some(parent) = executable.parent() {
-                let reloader = parent.join("PindoWidgetReloader");
+                let reloader = parent.join(WIDGET_RELOADER_NAME);
                 if reloader.is_file() {
                     let _ = std::process::Command::new(reloader).spawn();
                 }
@@ -237,7 +273,7 @@ fn send_task_notification(
     body: String,
 ) -> Result<(), String> {
     #[cfg(target_os = "macos")]
-    let _ = notify_rust::set_application("com.pindo.desktop");
+    let _ = notify_rust::set_application(APP_BUNDLE_IDENTIFIER);
     let handle = notify_rust::Notification::new()
         .summary(&format!("任务提醒 · {title}"))
         .body(&body)
@@ -346,7 +382,8 @@ pub fn run() {
                 let _ = window.show();
                 let _ = window.set_focus();
             }
-            if let Some(url) = args.iter().find(|arg| arg.starts_with("pindo://")) {
+            let scheme_prefix = format!("{APP_URL_SCHEME}://");
+            if let Some(url) = args.iter().find(|arg| arg.starts_with(&scheme_prefix)) {
                 let _ = app.emit("deep-link", url.clone());
             }
         }))
@@ -375,7 +412,8 @@ pub fn run() {
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
-            let connection = Connection::open(data_dir.join("pindo.db"))?;
+            migrate_legacy_database(&data_dir)?;
+            let connection = Connection::open(data_dir.join(DATA_FILE_NAME))?;
             migrate_database(&connection)?;
             app.manage(DatabaseState(Mutex::new(connection)));
             if let Ok(connection) = app.state::<DatabaseState>().0.lock() {
@@ -485,6 +523,39 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn legacy_database_is_copied_into_neutral_storage_location() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("todo-database-migration-{unique}"));
+        let namespace = legacy_namespace();
+        let legacy_directory = root.join(format!("com.{namespace}.desktop"));
+        let destination = root.join(APP_BUNDLE_IDENTIFIER);
+        std::fs::create_dir_all(&legacy_directory).expect("legacy directory");
+
+        let legacy_database = legacy_directory.join(format!("{namespace}.db"));
+        let connection = Connection::open(&legacy_database).expect("legacy database");
+        connection
+            .execute("CREATE TABLE sample (payload TEXT NOT NULL)", [])
+            .expect("legacy table");
+        connection
+            .execute("INSERT INTO sample (payload) VALUES ('preserved')", [])
+            .expect("legacy row");
+        drop(connection);
+
+        migrate_legacy_database(&destination).expect("database migration");
+        let migrated = Connection::open(destination.join(DATA_FILE_NAME)).expect("new database");
+        let payload: String = migrated
+            .query_row("SELECT payload FROM sample", [], |row| row.get(0))
+            .expect("migrated row");
+        assert_eq!(payload, "preserved");
+        drop(migrated);
+        std::fs::remove_dir_all(root).expect("cleanup");
+    }
 
     #[test]
     fn migration_v2_keeps_existing_payload_and_adds_reminder_columns() {

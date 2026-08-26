@@ -1,12 +1,12 @@
 [package]
-name = "blunote"
+name = "desktop-todo"
 version = "0.2.2"
 description = "轻量跨平台桌面待办挂件"
 authors = ["BluNote contributors"]
 edition = "2021"
 
 [lib]
-name = "blunote_lib"
+name = "desktop_todo_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
