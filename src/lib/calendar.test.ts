@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { itemsForDate, isOverdue, monthDays, weekDays } from "./calendar";
+import { dateKey, itemsForDate, isOverdue, monthDays, weekDays } from "./calendar";
 import type { TodoItem } from "../types";
 
 const item = (overrides: Partial<TodoItem> = {}): TodoItem => ({
@@ -10,12 +10,20 @@ const item = (overrides: Partial<TodoItem> = {}): TodoItem => ({
 });
 
 describe("calendar", () => {
-  it("周视图始终生成从当天开始的连续 7 天", () => {
+  it("周视图固定从周一开始并在周日结束", () => {
     const days = weekDays(new Date(2026, 7, 18));
     expect(days).toHaveLength(7);
-    expect(days[0].getDate()).toBe(18);
-    expect(days[6].getDate()).toBe(24);
-    expect(days[6].getTime() - days[0].getTime()).toBe(6 * 86400000);
+    expect(dateKey(days[0])).toBe("2026-08-17");
+    expect(dateKey(days[6])).toBe("2026-08-23");
+    expect(days[0].getDay()).toBe(1);
+    expect(days[6].getDay()).toBe(0);
+  });
+  it("周日仍归入此前周一开始的同一周", () => {
+    const days = weekDays(new Date(2026, 7, 23));
+    expect(days.map(dateKey)).toEqual([
+      "2026-08-17", "2026-08-18", "2026-08-19", "2026-08-20",
+      "2026-08-21", "2026-08-22", "2026-08-23",
+    ]);
   });
   it("月视图补齐完整周并包含整月", () => {
     const days = monthDays(new Date(2026, 7, 18));

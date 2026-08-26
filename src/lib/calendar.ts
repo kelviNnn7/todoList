@@ -3,7 +3,7 @@ import { zhCN } from "date-fns/locale";
 import type { TodoItem } from "../types";
 
 export function weekDays(anchor: Date): Date[] {
-  const first = startOfDay(anchor);
+  const first = startOfWeek(startOfDay(anchor), { weekStartsOn: 1 });
   return Array.from({ length: 7 }, (_, index) => addDays(first, index));
 }
 
