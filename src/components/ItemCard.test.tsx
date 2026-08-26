@@ -15,15 +15,22 @@ const task: TodoItem = {
 describe("ItemCard", () => {
   it("完成父任务时同步完成子任务", async () => {
     const onChange = vi.fn().mockResolvedValue(undefined); const user = userEvent.setup();
-    render(<ItemCard item={task} onChange={onChange} onDelete={vi.fn()}/>);
+    render(<ItemCard item={task} onChange={onChange} onDelete={vi.fn()} onEdit={vi.fn()}/>);
     await user.click(screen.getByRole("button", { name: "标记为完成" }));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ completed: true, subtasks: [expect.objectContaining({ completed: true })] }));
   });
   it("展开后可独立完成子任务", async () => {
     const onChange = vi.fn().mockResolvedValue(undefined); const user = userEvent.setup();
-    render(<ItemCard item={task} onChange={onChange} onDelete={vi.fn()}/>);
+    render(<ItemCard item={task} onChange={onChange} onDelete={vi.fn()} onEdit={vi.fn()}/>);
     await user.click(screen.getByRole("button", { name: "展开子任务" }));
     await user.click(screen.getByRole("checkbox", { name: /完成测试/ }));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ completed: true }));
+  });
+  it("展开后可以继续编辑事项", async () => {
+    const onEdit = vi.fn(); const user = userEvent.setup();
+    render(<ItemCard item={task} onChange={vi.fn()} onDelete={vi.fn()} onEdit={onEdit}/>);
+    await user.click(screen.getByRole("button", { name: "展开子任务" }));
+    await user.click(screen.getByRole("button", { name: `编辑任务：${task.title}` }));
+    expect(onEdit).toHaveBeenCalledWith(task);
   });
 });

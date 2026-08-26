@@ -39,23 +39,13 @@ describe("App", () => {
     expect(localStorage.getItem("pindo.desktopWidget")).toBe("true");
     expect(localStorage.getItem("pindo.appearanceOpacity")).toBe("75");
   });
-  it("展开窗口后可以调整内部侧栏宽度", async () => {
+  it("展开窗口后待办与日历固定为等宽双栏", async () => {
     const user = userEvent.setup();
-    render(<App/>);
+    const { container } = render(<App/>);
     await user.click(screen.getByRole("button", { name: "展开窗口" }));
-    const separator = screen.getByRole("separator", { name: "调整侧栏宽度" });
-    fireEvent.keyDown(separator, { key: "ArrowLeft" });
-    expect(separator).toHaveAttribute("aria-valuenow", "296");
-    expect(localStorage.getItem("pindo.sidebarWidth")).toBe("296");
-    const pointerDown = new Event("pointerdown", { bubbles: true });
-    Object.defineProperty(pointerDown, "clientX", { value: 100 });
-    fireEvent(separator, pointerDown);
-    const pointerMove = new Event("pointermove", { bubbles: true });
-    Object.defineProperty(pointerMove, "clientX", { value: -1000 });
-    fireEvent(window, pointerMove);
-    fireEvent.pointerUp(window);
-    expect(separator).toHaveAttribute("aria-valuenow", "380");
-    expect(localStorage.getItem("pindo.sidebarWidth")).toBe("380");
+    expect(container.querySelector("main")).toHaveClass("expanded");
+    expect(screen.queryByRole("separator", { name: "调整侧栏宽度" })).not.toBeInTheDocument();
+    expect(localStorage.getItem("pindo.sidebarWidth")).toBeNull();
   });
   it("展开窗口后待办列表保持为可滚动且可键盘访问的主区域", async () => {
     const user = userEvent.setup();

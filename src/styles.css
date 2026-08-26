@@ -59,7 +59,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   background: linear-gradient(135deg, rgba(255,255,255,.34), transparent 35%);
 }
 .app-shell.dragging { opacity: .7; cursor: grabbing; }
-.app-shell.expanded { padding: 28px; grid-template-columns: minmax(0, 1fr) var(--sidebar-width, 286px); grid-template-rows: auto auto 1fr; gap: 0 30px; }
+.app-shell.expanded { padding: 28px; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto auto 1fr; gap: 0 30px; }
 .drag-region { position: absolute; z-index: 2; top: 0; left: 44px; right: 44px; height: 14px; cursor: grab; }
 .topbar { cursor: grab; }
 .position-locked .drag-region, .position-locked .topbar { cursor: default; }
@@ -238,7 +238,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .subtask { display: grid; grid-template-columns: 16px 1fr auto; gap: 7px; align-items: center; margin: 8px 0; }
 .subtask input { accent-color: var(--accent); }
 .subtask time { color: var(--text-muted); font-size: 9px; }
-.danger-link { margin-top: 7px; padding: 5px 0; border: 0; background: none; color: var(--danger); font-size: 10px; display: flex; gap: 5px; align-items: center; cursor: pointer; }
+.item-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 7px; }
+.edit-link, .danger-link { padding: 5px 0; border: 0; background: none; font-size: 10px; display: flex; gap: 5px; align-items: center; cursor: pointer; }
+.edit-link { color: var(--accent); }
+.danger-link { color: var(--danger); }
 
 .empty-state { min-height: 164px; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
 .empty-icon { width: 45px; height: 45px; margin-bottom: 11px; border: .5px solid rgba(0,122,255,.12); border-radius: 50%; color: var(--accent); background: var(--accent-soft); display: grid; place-items: center; }
@@ -275,11 +278,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .button:disabled { opacity: .55; cursor: wait; }
 
 .expanded .topbar { grid-column: 1 / 3; }
-.panel-resizer { position: absolute; z-index: 8; top: 82px; right: calc(28px + var(--sidebar-width, 286px) + 11px); bottom: 28px; width: 8px; border-radius: 4px; cursor: col-resize; touch-action: none; display: grid; place-items: center; }
-.panel-resizer span { width: 2px; height: 42px; border-radius: 2px; background: var(--separator-strong); opacity: .35; transition: opacity .15s ease, background-color .15s ease; }
-.panel-resizer:hover span, .panel-resizer:focus-visible span, .panel-resizing .panel-resizer span { background: var(--accent); opacity: .8; }
-.panel-resizer:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.panel-resizing { cursor: col-resize; user-select: none; }
 .expanded .filters { grid-column: 2; grid-row: 2; align-self: start; grid-template-columns: 1fr; margin-top: 24px; padding: 6px; border: .5px solid var(--separator); background: var(--material); }
 .expanded .filters button { height: 35px; justify-content: flex-start; padding: 0 11px; }
 .expanded .filters button span { margin-left: auto; }

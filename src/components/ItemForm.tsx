@@ -1,18 +1,31 @@
 import { useMemo, useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import type { ItemDraft, ItemType, TodoItem } from "../types";
 import { validateDraft } from "../lib/validation";
 
-const initialDraft = (date: Date, type: ItemType): ItemDraft => ({
+const localDateTime = (value: string | null) => value ? format(parseISO(value), "yyyy-MM-dd'T'HH:mm") : "";
+const initialDraft = (date: Date, type: ItemType, item?: TodoItem): ItemDraft => item ? ({
+  type: item.type,
+  title: item.title,
+  notes: item.notes,
+  date: format(parseISO(item.type === "meeting" && item.startAt ? item.startAt : item.dueAt || date.toISOString()), "yyyy-MM-dd"),
+  startTime: item.startAt ? format(parseISO(item.startAt), "HH:mm") : "09:30",
+  endTime: item.endAt ? format(parseISO(item.endAt), "HH:mm") : "10:00",
+  location: item.location,
+  meetingUrl: item.meetingUrl,
+  reminderMinutes: item.reminderMinutes ?? 15,
+  taskReminderAt: localDateTime(item.reminderAt),
+  subtasks: item.subtasks.map((subtask) => ({ id: subtask.id, title: subtask.title, completed: subtask.completed, dueAt: localDateTime(subtask.dueAt) })),
+}) : ({
   type, title: "", notes: "", date: format(date, "yyyy-MM-dd"), startTime: "09:30", endTime: "10:00",
   location: "", meetingUrl: "", reminderMinutes: 15, taskReminderAt: "", subtasks: [],
 });
 
-interface Props { date: Date; initialType: ItemType; onClose: () => void; onSave: (item: TodoItem) => Promise<void> }
+interface Props { date: Date; initialType: ItemType; initialItem?: TodoItem; onClose: () => void; onSave: (item: TodoItem) => Promise<void> }
 
-export function ItemForm({ date, initialType, onClose, onSave }: Props) {
-  const [draft, setDraft] = useState(() => initialDraft(date, initialType));
+export function ItemForm({ date, initialType, initialItem, onClose, onSave }: Props) {
+  const [draft, setDraft] = useState(() => initialDraft(date, initialType, initialItem));
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const errors = useMemo(() => validateDraft(draft), [draft]);
@@ -24,24 +37,29 @@ export function ItemForm({ date, initialType, onClose, onSave }: Props) {
     const now = new Date().toISOString();
     const startAt = draft.type === "meeting" ? new Date(`${draft.date}T${draft.startTime}:00`).toISOString() : null;
     const endAt = draft.type === "meeting" && draft.endTime ? new Date(`${draft.date}T${draft.endTime}:00`).toISOString() : null;
+    const reminderAt = draft.type === "task" && draft.taskReminderAt ? new Date(draft.taskReminderAt).toISOString() : null;
+    const reminderChanged = reminderAt !== (initialItem?.reminderAt ?? null);
+    const meetingReminderChanged = startAt !== (initialItem?.startAt ?? null) || draft.reminderMinutes !== initialItem?.reminderMinutes;
     const item: TodoItem = {
-      id: crypto.randomUUID(), type: draft.type, title: draft.title.trim(), notes: draft.notes.trim(), startAt, endAt,
+      id: initialItem?.id ?? crypto.randomUUID(), type: draft.type, title: draft.title.trim(), notes: draft.notes.trim(), startAt, endAt,
       dueAt: draft.type === "task" && draft.date ? new Date(`${draft.date}T23:59:59`).toISOString() : null,
       location: draft.location.trim(), meetingUrl: draft.meetingUrl.trim(), reminderMinutes: draft.type === "meeting" ? draft.reminderMinutes : null,
-      reminderSentAt: null,
-      reminderAt: draft.type === "task" && draft.taskReminderAt ? new Date(draft.taskReminderAt).toISOString() : null,
-      reminderStatus: draft.type === "task" && draft.taskReminderAt ? "pending" : "none",
-      snoozeCount: 0, lastReminderAt: null, completed: false, source: "local",
-      subtasks: draft.subtasks.map((subtask) => ({ id: crypto.randomUUID(), title: subtask.title.trim(), completed: false, dueAt: subtask.dueAt ? new Date(subtask.dueAt).toISOString() : null })),
-      createdAt: now, updatedAt: now,
+      reminderSentAt: draft.type === "meeting" && !meetingReminderChanged ? initialItem?.reminderSentAt ?? null : null,
+      reminderAt,
+      reminderStatus: draft.type === "task" && reminderAt ? (reminderChanged ? "pending" : initialItem?.reminderStatus ?? "pending") : "none",
+      snoozeCount: draft.type === "task" && !reminderChanged ? initialItem?.snoozeCount ?? 0 : 0,
+      lastReminderAt: draft.type === "task" && !reminderChanged ? initialItem?.lastReminderAt ?? null : null,
+      completed: initialItem?.completed ?? false, source: initialItem?.source ?? "local",
+      subtasks: draft.subtasks.map((subtask) => ({ id: subtask.id ?? crypto.randomUUID(), title: subtask.title.trim(), completed: subtask.completed ?? false, dueAt: subtask.dueAt ? new Date(subtask.dueAt).toISOString() : null })),
+      createdAt: initialItem?.createdAt ?? now, updatedAt: now,
     };
     setSaving(true);
     try { await onSave(item); onClose(); } finally { setSaving(false); }
   }
 
   return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-    <section className="modal" role="dialog" aria-modal="true" aria-labelledby="new-item-title">
-      <header className="modal-header"><div><span className="eyebrow">新增事项</span><h2 id="new-item-title">安排你的下一步</h2></div><button className="icon-button" onClick={onClose} aria-label="关闭"><X size={18}/></button></header>
+    <section className="modal" role="dialog" aria-modal="true" aria-labelledby="item-form-title">
+      <header className="modal-header"><div><span className="eyebrow">{initialItem ? "编辑事项" : "新增事项"}</span><h2 id="item-form-title">{initialItem ? `继续编辑${initialItem.type === "meeting" ? "会议" : "任务"}` : "安排你的下一步"}</h2></div><button className="icon-button" onClick={onClose} aria-label="关闭"><X size={18}/></button></header>
       <form onSubmit={submit}>
         <div className="segmented" aria-label="事项类型">
           <button type="button" className={draft.type === "task" ? "active" : ""} onClick={() => update("type", "task")}>工作任务</button>
@@ -58,7 +76,7 @@ export function ItemForm({ date, initialType, onClose, onSave }: Props) {
           {submitted && errors.subtasks && <span className="field-error">{errors.subtasks}</span>}
         </div>}
         <label>备注<textarea maxLength={4000} rows={3} value={draft.notes} onChange={(e) => update("notes", e.target.value)} placeholder="补充上下文（可选）"/></label>
-        <footer className="modal-actions"><button type="button" className="button secondary" onClick={onClose}>取消</button><button className="button primary" disabled={saving}>{saving ? "保存中…" : "保存事项"}</button></footer>
+        <footer className="modal-actions"><button type="button" className="button secondary" onClick={onClose}>取消</button><button className="button primary" disabled={saving}>{saving ? "保存中…" : initialItem ? "保存修改" : "保存事项"}</button></footer>
       </form>
     </section>
   </div>;

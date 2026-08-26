@@ -44,5 +44,5 @@ export interface ItemDraft {
   meetingUrl: string;
   reminderMinutes: number;
   taskReminderAt: string;
-  subtasks: Array<{ title: string; dueAt: string }>;
+  subtasks: Array<{ id?: string; title: string; completed?: boolean; dueAt: string }>;
 }
