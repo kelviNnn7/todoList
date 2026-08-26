@@ -1,6 +1,8 @@
 node_modules
 dist
 coverage
+output
+release
 .DS_Store
 src-tauri/target
 src-tauri/gen/schemas
