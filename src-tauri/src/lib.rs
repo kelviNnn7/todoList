@@ -26,6 +26,14 @@ struct WindowPreferences {
     widget_opacity: AtomicU64,
 }
 
+fn persisted_window_state_flags() -> StateFlags {
+    // Tauri stores window dimensions in physical pixels. Restoring those values before macOS
+    // has settled the monitor scale factor can turn a 360×620 logical window into 720×1240 on
+    // Retina displays, while the web UI still starts in compact mode. Position is scale-safe;
+    // the window size is intentionally reset from tauri.conf.json on every cold start.
+    StateFlags::POSITION
+}
+
 fn migrate_database(connection: &Connection) -> rusqlite::Result<()> {
     connection.execute(
         "CREATE TABLE IF NOT EXISTS items (id TEXT PRIMARY KEY NOT NULL, payload TEXT NOT NULL CHECK(length(payload) <= 65535), updated_at TEXT NOT NULL, reminder_at TEXT, reminder_status TEXT NOT NULL DEFAULT 'none', snooze_count INTEGER NOT NULL DEFAULT 0)",
@@ -83,7 +91,7 @@ fn clamp_window_position(
     )
 }
 
-fn schedule_window_state_save(window: &tauri::Window) {
+fn schedule_window_position_save(window: &tauri::Window) {
     let preferences = window.state::<WindowPreferences>();
     let epoch = preferences.move_epoch.fetch_add(1, Ordering::Relaxed) + 1;
     let app = window.app_handle().clone();
@@ -91,7 +99,7 @@ fn schedule_window_state_save(window: &tauri::Window) {
         std::thread::sleep(Duration::from_millis(500));
         let preferences = app.state::<WindowPreferences>();
         if preferences.move_epoch.load(Ordering::Relaxed) == epoch {
-            let _ = app.save_window_state(StateFlags::POSITION | StateFlags::SIZE);
+            let _ = app.save_window_state(persisted_window_state_flags());
         }
     });
 }
@@ -343,7 +351,11 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(persisted_window_state_flags())
+                .build(),
+        )
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             Some(vec!["--silent"]),
@@ -438,7 +450,7 @@ pub fn run() {
                         let _ = window.set_position(Position::Physical(target));
                     }
                 }
-                schedule_window_state_save(window);
+                schedule_window_position_save(window);
             }
             WindowEvent::Resized(size) => {
                 let monitor = window
@@ -463,7 +475,6 @@ pub fn run() {
                         }
                     }
                 }
-                schedule_window_state_save(window);
             }
             _ => {}
         })
@@ -548,5 +559,12 @@ mod tests {
     #[test]
     fn oversized_window_is_anchored_to_work_area_origin() {
         assert_eq!(clamp_axis(500, 100, 800, 1200), 100);
+    }
+
+    #[test]
+    fn startup_restores_position_without_retina_scaled_size() {
+        let flags = persisted_window_state_flags();
+        assert!(flags.contains(StateFlags::POSITION));
+        assert!(!flags.contains(StateFlags::SIZE));
     }
 }
