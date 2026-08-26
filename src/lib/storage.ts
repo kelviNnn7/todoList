@@ -1,9 +1,8 @@
 import type { TodoItem } from "../types";
 import { readScopedValue, writeScopedValue } from "./scopedStorage";
+import { invoke, isDesktopRuntime } from "./desktop";
 
 const FALLBACK_ENTRY = "items.v1";
-
-const inTauri = () => "__TAURI_INTERNALS__" in window;
 
 function safeParse(payload: string): TodoItem | null {
   try {
@@ -21,8 +20,7 @@ function safeParse(payload: string): TodoItem | null {
 }
 
 export async function loadItems(): Promise<TodoItem[]> {
-  if (inTauri()) {
-    const { invoke } = await import("@tauri-apps/api/core");
+  if (isDesktopRuntime()) {
     const rows = await invoke<string[]>("list_items");
     return rows.map(safeParse).filter((item): item is TodoItem => item !== null);
   }
@@ -39,8 +37,7 @@ function safeParseArray(payload: string | null): TodoItem[] | null {
 }
 
 export async function saveItem(item: TodoItem): Promise<void> {
-  if (inTauri()) {
-    const { invoke } = await import("@tauri-apps/api/core");
+  if (isDesktopRuntime()) {
     await invoke("upsert_item", { id: item.id, payload: JSON.stringify(item), updatedAt: item.updatedAt });
     return;
   }
@@ -50,7 +47,7 @@ export async function saveItem(item: TodoItem): Promise<void> {
 }
 
 export async function deleteItem(id: string): Promise<void> {
-  if (inTauri()) { const { invoke } = await import("@tauri-apps/api/core"); await invoke("delete_item", { id }); return; }
+  if (isDesktopRuntime()) { await invoke("delete_item", { id }); return; }
   const items = await loadItems();
   writeScopedValue(FALLBACK_ENTRY, JSON.stringify(items.filter((item) => item.id !== id)));
 }

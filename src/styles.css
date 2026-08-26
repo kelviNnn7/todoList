@@ -60,9 +60,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 }
 .app-shell.dragging { opacity: .7; cursor: grabbing; }
 .app-shell.expanded { padding: 28px; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto auto 1fr; gap: 0 30px; }
-.drag-region { position: absolute; z-index: 2; top: 0; left: 44px; right: 44px; height: 14px; cursor: grab; }
-.topbar { cursor: grab; }
-.position-locked .drag-region, .position-locked .topbar { cursor: default; }
+.drag-region { position: absolute; z-index: 2; top: 0; left: 44px; right: 44px; height: 14px; cursor: grab; -webkit-app-region: drag; }
+.topbar { cursor: grab; -webkit-app-region: drag; }
+.topbar button, .topbar input, .topbar select, .topbar textarea, .topbar a, .topbar label, .topbar .app-menu, .topbar [role="separator"] { -webkit-app-region: no-drag; }
+.position-locked .drag-region, .position-locked .topbar { cursor: default; -webkit-app-region: no-drag; }
 .window-resize-handle { position: absolute; z-index: 50; user-select: none; touch-action: none; }
 .resize-north, .resize-south { left: 12px; right: 12px; height: 7px; }
 .resize-north { top: 0; cursor: ns-resize; }

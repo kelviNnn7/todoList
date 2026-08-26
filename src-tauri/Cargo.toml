@@ -1,6 +1,6 @@
 [package]
 name = "desktop-todo"
-version = "0.2.2"
+version = "0.2.4"
 description = "轻量跨平台桌面待办挂件"
 authors = ["BluNote contributors"]
 edition = "2021"

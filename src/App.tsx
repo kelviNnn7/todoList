@@ -9,13 +9,12 @@ import { parseIcs } from "./lib/ics";
 import { isTaskReminderDue, markReminderFired, quickSnoozeAt, snoozeTask, type QuickSnooze } from "./lib/reminders";
 import { deleteItem, loadItems, saveItem } from "./lib/storage";
 import { readScopedValue, writeScopedValue } from "./lib/scopedStorage";
+import { endResizeDragging, invoke, isAutostartEnabled, isDesktopRuntime, isElectronRuntime, listen, sendMeetingNotification, setAutostartEnabled, startDragging, startResizeDragging, updateResizeDragging } from "./lib/desktop";
 import type { CalendarViewMode, FilterType, ItemType, TodoItem } from "./types";
 import appIcon from "./assets/app-icon.png";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 
 type ResizeDirection = "East" | "North" | "NorthEast" | "NorthWest" | "South" | "SouthEast" | "SouthWest" | "West";
 
-const isTauri = () => "__TAURI_INTERNALS__" in window;
 const savedOpacity = () => {
   const value = Number(readScopedValue("appearanceOpacity"));
   return Number.isFinite(value) && value >= 55 && value <= 100 ? Math.round(value / 5) * 5 : 95;
@@ -51,24 +50,24 @@ export default function App() {
   useEffect(() => { itemsRef.current = items; }, [items]);
   useEffect(() => { loadItems().then(setItems).finally(() => setLoading(false)); }, []);
   useEffect(() => {
-    if (!isTauri()) return;
-    import("@tauri-apps/plugin-autostart").then(({ isEnabled }) => isEnabled().then(setAutostart)).catch(() => setAutostart(false));
+    if (!isDesktopRuntime()) return;
+    isAutostartEnabled().then(setAutostart).catch(() => setAutostart(false));
   }, []);
   useEffect(() => {
-    if (!isTauri()) return;
-    import("@tauri-apps/api/core").then(({ invoke }) => invoke("set_desktop_widget_mode", { enabled: desktopWidget })).catch(() => undefined);
+    if (!isDesktopRuntime()) return;
+    invoke("set_desktop_widget_mode", { enabled: desktopWidget }).catch(() => undefined);
   }, [desktopWidget]);
   useEffect(() => {
-    if (!isTauri()) return;
-    import("@tauri-apps/api/core").then(({ invoke }) => invoke("set_edge_snap", { enabled: edgeSnap })).catch(() => undefined);
+    if (!isDesktopRuntime()) return;
+    invoke("set_edge_snap", { enabled: edgeSnap }).catch(() => undefined);
   }, [edgeSnap]);
   useEffect(() => {
-    if (!isTauri()) return;
-    import("@tauri-apps/api/core").then(({ invoke }) => invoke("set_position_locked", { locked })).catch(() => undefined);
+    if (!isDesktopRuntime()) return;
+    invoke("set_position_locked", { locked }).catch(() => undefined);
   }, [locked]);
   useEffect(() => {
-    if (!isTauri()) return;
-    import("@tauri-apps/api/core").then(({ invoke }) => invoke("set_widget_opacity", { opacity: appearanceOpacity })).catch(() => undefined);
+    if (!isDesktopRuntime()) return;
+    invoke("set_widget_opacity", { opacity: appearanceOpacity }).catch(() => undefined);
   }, [appearanceOpacity]);
   useEffect(() => {
     const endDrag = () => setDragging(false);
@@ -76,19 +75,19 @@ export default function App() {
     return () => { window.removeEventListener("pointerup", endDrag); window.removeEventListener("blur", endDrag); };
   }, []);
   useEffect(() => {
-    if (!isTauri()) return;
+    if (!isDesktopRuntime()) return;
     let unlisten: (() => void) | undefined;
-    import("@tauri-apps/api/event").then(({ listen }) => listen<string>("deep-link", ({ payload }) => {
+    listen<string>("deep-link", (payload) => {
       if (payload.endsWith("://today")) { const today = new Date(); setSelectedDate(today); setCalendarAnchor(today); }
-    })).then((dispose) => { unlisten = dispose; }).catch(() => undefined);
+    }).then((dispose) => { unlisten = dispose; }).catch(() => undefined);
     return () => unlisten?.();
   }, []);
   useEffect(() => {
-    if (!isTauri()) return;
+    if (!isDesktopRuntime()) return;
     let unlisten: (() => void) | undefined;
-    import("@tauri-apps/api/event").then(({ listen }) => listen<boolean>("position-lock-changed", ({ payload }) => {
+    listen<boolean>("position-lock-changed", (payload) => {
       setLocked(payload); writeScopedValue("positionLocked", String(payload));
-    })).then((dispose) => { unlisten = dispose; }).catch(() => undefined);
+    }).then((dispose) => { unlisten = dispose; }).catch(() => undefined);
     return () => unlisten?.();
   }, []);
 
@@ -101,9 +100,9 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!isTauri()) return;
+    if (!isDesktopRuntime()) return;
     let unlisten: (() => void) | undefined;
-    import("@tauri-apps/api/event").then(({ listen }) => listen<{ taskId: string; actionId: string }>("task-reminder-action", ({ payload }) => {
+    listen<{ taskId: string; actionId: string }>("task-reminder-action", (payload) => {
         const { actionId, taskId } = payload;
         const task = taskId ? itemsRef.current.find((item) => item.id === taskId) : undefined;
         if (!task) return;
@@ -111,31 +110,28 @@ export default function App() {
           const target = itemDate(task); if (target) { setSelectedDate(target); setCalendarAnchor(target); }
           setFocusedItemId(task.id);
           setFilter("task"); setNotice(actionId === "custom" ? "请在任务详情中选择自定义提醒时间" : "已打开提醒任务");
-          import("@tauri-apps/api/core").then(({ invoke }) => invoke("show_main_window")).catch(() => undefined); return;
+          invoke("show_main_window").catch(() => undefined); return;
         }
         if (actionId === "30m" || actionId === "1h" || actionId === "tomorrow9") {
           void persist(snoozeTask(task, quickSnoozeAt(actionId as QuickSnooze))).catch((error) => setNotice(error instanceof Error ? error.message : "稍后提醒失败"));
         }
-      })).then((dispose) => { unlisten = dispose; }).catch(() => undefined);
+      }).then((dispose) => { unlisten = dispose; }).catch(() => undefined);
     return () => unlisten?.();
   }, [persist]);
 
   useEffect(() => {
-    if (!isTauri()) return;
+    if (!isDesktopRuntime()) return;
     const scan = async () => {
       const now = new Date();
       for (const item of itemsRef.current) {
         if (item.type === "meeting" && !item.completed && item.startAt && item.reminderMinutes != null && !item.reminderSentAt) {
           const triggerAt = new Date(item.startAt).getTime() - item.reminderMinutes * 60_000;
           if (now.getTime() >= triggerAt && now.getTime() < new Date(item.startAt).getTime() + 60_000) {
-            const { isPermissionGranted, requestPermission, sendNotification } = await import("@tauri-apps/plugin-notification");
-            let granted = await isPermissionGranted(); if (!granted) granted = (await requestPermission()) === "granted";
-            if (granted) sendNotification({ title: `即将开始 · ${item.title}`, body: item.location || `${item.reminderMinutes} 分钟后开始` });
+            await sendMeetingNotification(`即将开始 · ${item.title}`, item.location || `${item.reminderMinutes} 分钟后开始`);
             await persist({ ...item, reminderSentAt: now.toISOString(), updatedAt: now.toISOString() });
           }
         }
         if (isTaskReminderDue(item, now)) {
-          const { invoke } = await import("@tauri-apps/api/core");
           await invoke("send_task_notification", { taskId: item.id, title: item.title, body: item.notes || "该处理这项任务了" });
           await persist(markReminderFired(item, now));
         }
@@ -152,20 +148,20 @@ export default function App() {
   function chooseView(next: CalendarViewMode) { setViewMode(next); setCalendarAnchor(selectedDate); writeScopedValue(`calendarView.${expandedWindow ? "expanded" : "widget"}`, next); }
   async function toggleWindow() {
     const next = !expandedWindow; setExpandedWindow(next); setViewMode(savedView(next)); setCalendarAnchor(selectedDate);
-    if (isTauri()) { const { invoke } = await import("@tauri-apps/api/core"); await invoke("set_window_mode", { expanded: next }); }
+    if (isDesktopRuntime()) await invoke("set_window_mode", { expanded: next });
   }
   function toggleLock() {
     const next = !locked; setLocked(next); writeScopedValue("positionLocked", String(next));
   }
   function toggleEdgeSnap() { const next = !edgeSnap; setEdgeSnap(next); writeScopedValue("edgeSnap", String(next)); }
   async function toggleAutostart() {
-    if (!isTauri()) { setNotice("开机自启仅在桌面应用中可用"); return; }
-    const plugin = await import("@tauri-apps/plugin-autostart"); if (autostart) await plugin.disable(); else await plugin.enable();
+    if (!isDesktopRuntime()) { setNotice("开机自启仅在桌面应用中可用"); return; }
+    await setAutostartEnabled(!autostart);
     setAutostart(!autostart); setNotice(`开机自启已${autostart ? "关闭" : "开启"}`); setMenuOpen(false); window.setTimeout(() => setNotice(""), 2500);
   }
   async function toggleDesktopWidget() {
     const next = !desktopWidget; setDesktopWidget(next); writeScopedValue("desktopWidget", String(next));
-    if (next && expandedWindow) { setExpandedWindow(false); setViewMode(savedView(false)); if (isTauri()) { const { invoke } = await import("@tauri-apps/api/core"); await invoke("set_window_mode", { expanded: false }); } }
+    if (next && expandedWindow) { setExpandedWindow(false); setViewMode(savedView(false)); if (isDesktopRuntime()) await invoke("set_window_mode", { expanded: false }); }
     setNotice(next ? "已切换为桌面小组件" : "已恢复普通窗口模式"); window.setTimeout(() => setNotice(""), 2200);
   }
   function updateAppearanceOpacity(value: number) { const next = Math.min(100, Math.max(55, value)); setAppearanceOpacity(next); writeScopedValue("appearanceOpacity", String(next)); }
@@ -179,17 +175,29 @@ export default function App() {
   const calendarTitle = viewMode === "week" ? `${format(days[0], "M月d日")} — ${format(days[6], "M月d日")}` : format(calendarAnchor, "yyyy年 M月");
   function startWindowResize(direction: ResizeDirection, event: React.PointerEvent) {
     event.preventDefault(); event.stopPropagation();
-    if (!isTauri()) return;
-    void getCurrentWindow().startResizeDragging(direction);
+    if (!isDesktopRuntime()) return;
+    if (!isElectronRuntime()) { void startResizeDragging(direction); return; }
+    const point = { x: event.screenX, y: event.screenY };
+    void startResizeDragging(direction, point);
+    const move = (moveEvent: PointerEvent) => void updateResizeDragging({ x: moveEvent.screenX, y: moveEvent.screenY });
+    const finish = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("blur", finish);
+      void endResizeDragging();
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("blur", finish);
   }
   function startWindowDrag(event: React.MouseEvent) {
-    if (locked || event.button !== 0 || (event.target as HTMLElement).closest("button,input,select,textarea,a,[role=separator]")) return;
+    if (locked || event.button !== 0 || (event.target as HTMLElement).closest("button,input,select,textarea,a,label,.app-menu,[role=separator]")) return;
     event.preventDefault();
     setDragging(true);
-    if (!isTauri()) return;
-    void getCurrentWindow().startDragging().catch(() => setNotice("窗口拖动启动失败，请重试"));
+    if (!isDesktopRuntime()) return;
+    void startDragging().catch(() => setNotice("窗口拖动启动失败，请重试"));
   }
-  return <main className={`app-shell ${expandedWindow ? "expanded" : ""} ${desktopWidget ? "desktop-widget" : ""} ${locked ? "position-locked" : ""} ${dragging ? "dragging" : ""}`} style={{ "--widget-opacity": appearanceOpacity / 100 } as React.CSSProperties}>
+  return <main className={`app-shell ${isElectronRuntime() ? "runtime-electron" : ""} ${expandedWindow ? "expanded" : ""} ${desktopWidget ? "desktop-widget" : ""} ${locked ? "position-locked" : ""} ${dragging ? "dragging" : ""}`} style={{ "--widget-opacity": appearanceOpacity / 100 } as React.CSSProperties}>
     {resizeDirections.map((direction) => <div key={direction} className={`window-resize-handle resize-${direction.toLowerCase()}`} aria-hidden="true" onPointerDown={(event) => startWindowResize(direction, event)}/>)}
     <div className="drag-region" onMouseDown={startWindowDrag}/>
     <header className="topbar" onMouseDown={startWindowDrag}>
