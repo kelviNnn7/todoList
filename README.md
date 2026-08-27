@@ -1,6 +1,6 @@
 # BluNote
 
-BluNote 是一款面向 macOS 与 Windows 的轻量桌面待办挂件，用紧凑的日历、任务和会议视图帮助用户管理当天安排。应用采用 Tauri 2 + React 19 构建，数据与设置默认只保存在本机。
+BluNote 是一款面向 macOS、Windows 与银河麒麟的轻量桌面待办挂件，用紧凑的日历、任务和会议视图帮助用户管理当天安排。macOS/Windows 采用 Tauri 2，银河麒麟采用自包含 Electron 运行时，界面统一使用 React 19，数据与设置默认只保存在本机。
 
 当前版本：`0.3.2`
 
@@ -10,6 +10,7 @@ BluNote 是一款面向 macOS 与 Windows 的轻量桌面待办挂件，用紧�
 |---|---|---|
 | macOS | macOS 13 | 本地 DMG 按构建机器架构生成；当前提供的安装包为 Apple Silicon `arm64` |
 | Windows | Windows 10 21H2 | 使用 NSIS 生成安装程序，WebView2 采用下载引导安装模式 |
+| 银河麒麟 | V10 SP1 2503，x86_64/Hygon C86 | 使用自包含 Electron 的 DEB，不依赖 `libwebkit2gtk-4.1-0`；v0.3.2 已精简冗余前端依赖和语言包 |
 
 面向外部用户正式分发前，macOS 安装包需要 Developer ID 签名与 Apple 公证，Windows 安装包需要 Authenticode 签名。Intel 与 Apple Silicon 通用的 macOS 安装包还需要额外构建 Universal 2 产物。
 

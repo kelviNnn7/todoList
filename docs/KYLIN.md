@@ -6,7 +6,7 @@
 
 ## 图形化安装
 
-1. 双击 `BluNote-0.2.4-kylin-v10-amd64.deb`。
+1. 双击 `BluNote-0.3.2-kylin-v10-amd64.deb`。
 2. 在麒麟软件安装器中选择“安装”。
 3. 根据系统提示输入管理员密码。
 4. 安装完成后，从应用菜单的“实用工具”分类启动 BluNote。
@@ -34,3 +34,12 @@ npm run build:kylin-v10
 ```
 
 构建产物位于 `release/kylin-v10-build/`。发布前必须拆包检查 `Architecture: amd64`、依赖清单、ELF 架构、桌面入口和 SHA-256。
+
+## v0.3.2 体积优化
+
+- 使用最高压缩等级生成 DEB。
+- Electron 仅保留 `zh-CN` 语言资源。
+- 前端已由 Vite 完整打包，安装时不再重复携带 `node_modules`；`app.asar` 从约 40 MB 降至约 537 KB。
+- DEB 从 102,736,720 字节降至 97,729,360 字节，减少 5,007,360 字节（约 4.87%）。
+- 安装展开大小从 328,741 KiB 降至 279,920 KiB，减少约 14.85%。
+- 保留 Chromium 许可证、Vulkan/SwiftShader 软件渲染、200% 缩放资源和崩溃处理程序，避免在 Hygon 与不同显卡环境中出现白屏或高 DPI 显示退化。
