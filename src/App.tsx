@@ -4,7 +4,7 @@ import { zhCN } from "date-fns/locale";
 import { BellRing, BriefcaseBusiness, CalendarDays, Check, ChevronLeft, ChevronRight, Ellipsis, Expand, Lock, Minimize2, Plus, Unlock } from "lucide-react";
 import { ItemCard } from "./components/ItemCard";
 import { ItemForm } from "./components/ItemForm";
-import { dateKey, itemDate, itemsForDate, longDate, monthDays, sortItems, weekDays } from "./lib/calendar";
+import { dateKey, itemDate, itemOccurrenceForDate, itemsForDate, longDate, monthDays, sortItems, weekDays } from "./lib/calendar";
 import { parseIcs } from "./lib/ics";
 import { isTaskReminderDue, markReminderFired, quickSnoozeAt, snoozeTask, type QuickSnooze } from "./lib/reminders";
 import { deleteItem, loadItems, saveItem } from "./lib/storage";
@@ -14,6 +14,7 @@ import type { CalendarViewMode, FilterType, ItemType, TodoItem } from "./types";
 import appIcon from "./assets/app-icon.png";
 
 type ResizeDirection = "East" | "North" | "NorthEast" | "NorthWest" | "South" | "SouthEast" | "SouthWest" | "West";
+type FontSize = "small" | "standard" | "large";
 
 const savedOpacity = () => {
   const value = Number(readScopedValue("appearanceOpacity"));
@@ -23,6 +24,11 @@ const savedView = (expanded: boolean): CalendarViewMode => {
   const value = readScopedValue(`calendarView.${expanded ? "expanded" : "widget"}`);
   return value === "week" || value === "month" ? value : expanded ? "month" : "week";
 };
+const savedFontSize = (): FontSize => {
+  const value = readScopedValue("appearanceFontSize");
+  return value === "small" || value === "large" ? value : "standard";
+};
+const fontScale: Record<FontSize, number> = { small: 0.9, standard: 1, large: 1.12 };
 const resizeDirections: ResizeDirection[] = ["North", "NorthEast", "East", "SouthEast", "South", "SouthWest", "West", "NorthWest"];
 export default function App() {
   const [items, setItems] = useState<TodoItem[]>([]);
@@ -40,10 +46,12 @@ export default function App() {
   const [autostart, setAutostart] = useState(false);
   const [desktopWidget, setDesktopWidget] = useState(() => readScopedValue("desktopWidget") === "true");
   const [appearanceOpacity, setAppearanceOpacity] = useState(savedOpacity);
+  const [appearanceFontSize, setAppearanceFontSize] = useState<FontSize>(savedFontSize);
   const [menuOpen, setMenuOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
   const importInput = useRef<HTMLInputElement>(null);
+  const menuContainer = useRef<HTMLSpanElement>(null);
   const itemsRef = useRef(items);
   const days = useMemo(() => viewMode === "week" ? weekDays(calendarAnchor) : monthDays(calendarAnchor), [calendarAnchor, viewMode]);
 
@@ -70,6 +78,14 @@ export default function App() {
     invoke("set_widget_opacity", { opacity: appearanceOpacity }).catch(() => undefined);
   }, [appearanceOpacity]);
   useEffect(() => {
+    if (!menuOpen) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!menuContainer.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, [menuOpen]);
+  useEffect(() => {
     const endDrag = () => setDragging(false);
     window.addEventListener("pointerup", endDrag); window.addEventListener("blur", endDrag);
     return () => { window.removeEventListener("pointerup", endDrag); window.removeEventListener("blur", endDrag); };
@@ -94,6 +110,16 @@ export default function App() {
   const persist = useCallback(async (item: TodoItem) => {
     await saveItem(item); setItems((current) => [item, ...current.filter((value) => value.id !== item.id)]);
   }, []);
+  const persistOccurrence = useCallback(async (changed: TodoItem) => {
+    const original = itemsRef.current.find((item) => item.id === changed.id);
+    if (!original || original.type !== "task" || original.taskSchedule?.mode !== "weekly") {
+      await persist(changed); return;
+    }
+    const occurrence = dateKey(selectedDate);
+    const completedDates = new Set(original.completedDates ?? []);
+    if (changed.completed) completedDates.add(occurrence); else completedDates.delete(occurrence);
+    await persist({ ...original, ...changed, dueAt: original.dueAt, completed: false, completedDates: [...completedDates].sort(), updatedAt: new Date().toISOString() });
+  }, [persist, selectedDate]);
   const remove = useCallback(async (id: string) => {
     if (!window.confirm("确定删除这个事项吗？此操作无法撤销。")) return;
     await deleteItem(id); setItems((current) => current.filter((item) => item.id !== id));
@@ -140,10 +166,10 @@ export default function App() {
     void scan(); const timer = window.setInterval(() => void scan(), 30_000); return () => clearInterval(timer);
   }, [persist]);
 
-  const visible = useMemo(() => sortItems(itemsForDate(items, selectedDate).filter((item) => filter === "all" || item.type === filter)), [items, selectedDate, filter]);
+  const visible = useMemo(() => sortItems(itemsForDate(items, selectedDate).filter((item) => filter === "all" || item.type === filter).map((item) => itemOccurrenceForDate(item, selectedDate))), [items, selectedDate, filter]);
   const counts = useMemo(() => ({ task: items.filter((item) => item.type === "task" && !item.completed).length, meeting: items.filter((item) => item.type === "meeting" && !item.completed).length }), [items]);
   function openCreate(type: ItemType) { setEditingItem(null); setFormType(type); }
-  function openEdit(item: TodoItem) { setEditingItem(item); setFormType(item.type); }
+  function openEdit(item: TodoItem) { const original = items.find((value) => value.id === item.id) ?? item; setEditingItem(original); setFormType(original.type); }
   function closeForm() { setFormType(null); setEditingItem(null); }
   function chooseView(next: CalendarViewMode) { setViewMode(next); setCalendarAnchor(selectedDate); writeScopedValue(`calendarView.${expandedWindow ? "expanded" : "widget"}`, next); }
   async function toggleWindow() {
@@ -165,6 +191,7 @@ export default function App() {
     setNotice(next ? "已切换为桌面小组件" : "已恢复普通窗口模式"); window.setTimeout(() => setNotice(""), 2200);
   }
   function updateAppearanceOpacity(value: number) { const next = Math.min(100, Math.max(55, value)); setAppearanceOpacity(next); writeScopedValue("appearanceOpacity", String(next)); }
+  function updateAppearanceFontSize(value: FontSize) { setAppearanceFontSize(value); writeScopedValue("appearanceFontSize", value); }
   async function importIcsFile(file: File | undefined) {
     if (!file) return;
     try { const imported = parseIcs(await file.text()); for (const item of imported) await saveItem(item); setItems((current) => [...imported, ...current.filter((item) => !imported.some((value) => value.id === item.id))]); setNotice(`已导入 ${imported.length} 场会议`); }
@@ -197,19 +224,19 @@ export default function App() {
     if (!isDesktopRuntime()) return;
     void startDragging().catch(() => setNotice("窗口拖动启动失败，请重试"));
   }
-  return <main className={`app-shell ${isElectronRuntime() ? "runtime-electron" : ""} ${expandedWindow ? "expanded" : ""} ${desktopWidget ? "desktop-widget" : ""} ${locked ? "position-locked" : ""} ${dragging ? "dragging" : ""}`} style={{ "--widget-opacity": appearanceOpacity / 100 } as React.CSSProperties}>
+  return <main className={`app-shell ${isElectronRuntime() ? "runtime-electron" : ""} ${expandedWindow ? "expanded" : ""} ${desktopWidget ? "desktop-widget" : ""} ${locked ? "position-locked" : ""} ${dragging ? "dragging" : ""}`} style={{ "--widget-opacity": appearanceOpacity / 100, "--font-scale": fontScale[appearanceFontSize] } as React.CSSProperties}>
     {resizeDirections.map((direction) => <div key={direction} className={`window-resize-handle resize-${direction.toLowerCase()}`} aria-hidden="true" onPointerDown={(event) => startWindowResize(direction, event)}/>)}
     <div className="drag-region" onMouseDown={startWindowDrag}/>
     <header className="topbar" onMouseDown={startWindowDrag}>
       <div className="date-heading"><span className="brand-line"><img className="app-glyph" src={appIcon} alt=""/>BluNote</span><h1>{longDate(new Date())}</h1></div>
-      <div className="top-actions"><button className="icon-button" aria-label={locked ? "解锁位置" : "锁定位置"} title={locked ? "解锁位置" : "锁定位置"} onClick={toggleLock}>{locked ? <Lock size={17}/> : <Unlock size={17}/>}</button><button className="icon-button" aria-label={expandedWindow ? "收起挂件" : "展开窗口"} title={expandedWindow ? "收起挂件" : "展开窗口"} onClick={toggleWindow}>{expandedWindow ? <Minimize2 size={17}/> : <Expand size={17}/>}</button><button className={`icon-button ${menuOpen ? "pressed" : ""}`} aria-label="更多选项" title="更多选项" aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}><Ellipsis size={19}/></button><span className="toolbar-divider" aria-hidden="true"/><button className="add-button" onClick={() => openCreate(filter === "meeting" ? "meeting" : "task")} aria-label="新增事项"><Plus size={19}/></button>
-        {menuOpen && <div className="app-menu" role="dialog" aria-label="更多设置"><span className="menu-title">小组件</span><label className="menu-setting"><span><strong>桌面小组件</strong><small>驻留桌面，不遮挡其他窗口</small></span><input type="checkbox" checked={desktopWidget} onChange={() => void toggleDesktopWidget()}/><i aria-hidden="true"/></label><label className="menu-setting"><span><strong>锁定位置</strong><small>防止意外拖动挂件</small></span><input type="checkbox" checked={locked} onChange={() => void toggleLock()}/><i aria-hidden="true"/></label><label className="menu-setting"><span><strong>边缘吸附</strong><small>靠近屏幕边缘 8px 自动贴合</small></span><input type="checkbox" checked={edgeSnap} onChange={toggleEdgeSnap}/><i aria-hidden="true"/></label><label className="opacity-setting"><span>外观透明度<output>{appearanceOpacity}%</output></span><input aria-label="外观透明度" type="range" min="55" max="100" step="5" value={appearanceOpacity} onChange={(event) => updateAppearanceOpacity(Number(event.target.value))}/></label><div className="menu-divider"/><button onClick={() => importInput.current?.click()}>导入 ICS 日历</button><button onClick={() => void toggleAutostart()}>开机自启：{autostart ? "开" : "关"}</button><small className="menu-footnote">设置与数据仅保存在本机</small></div>}
+      <div className="top-actions"><button className="icon-button" aria-label={locked ? "解锁位置" : "锁定位置"} title={locked ? "解锁位置" : "锁定位置"} onClick={toggleLock}>{locked ? <Lock size={17}/> : <Unlock size={17}/>}</button><button className="icon-button" aria-label={expandedWindow ? "收起挂件" : "展开窗口"} title={expandedWindow ? "收起挂件" : "展开窗口"} onClick={toggleWindow}>{expandedWindow ? <Minimize2 size={17}/> : <Expand size={17}/>}</button><span className="menu-container" ref={menuContainer}><button className={`icon-button ${menuOpen ? "pressed" : ""}`} aria-label="更多选项" title="更多选项" aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}><Ellipsis size={19}/></button>
+        {menuOpen && <div className="app-menu" role="dialog" aria-label="更多设置"><span className="menu-title">小组件</span><label className="menu-setting"><span><strong>桌面小组件</strong><small>驻留桌面，不遮挡其他窗口</small></span><input type="checkbox" checked={desktopWidget} onChange={() => void toggleDesktopWidget()}/><i aria-hidden="true"/></label><label className="menu-setting"><span><strong>锁定位置</strong><small>防止意外拖动挂件</small></span><input type="checkbox" checked={locked} onChange={() => void toggleLock()}/><i aria-hidden="true"/></label><label className="menu-setting"><span><strong>边缘吸附</strong><small>靠近屏幕边缘 8px 自动贴合</small></span><input type="checkbox" checked={edgeSnap} onChange={toggleEdgeSnap}/><i aria-hidden="true"/></label><label className="opacity-setting"><span>外观透明度<output>{appearanceOpacity}%</output></span><input aria-label="外观透明度" type="range" min="55" max="100" step="5" value={appearanceOpacity} onChange={(event) => updateAppearanceOpacity(Number(event.target.value))}/></label><label className="font-size-setting"><span>字体大小</span><select aria-label="字体大小" value={appearanceFontSize} onChange={(event) => updateAppearanceFontSize(event.target.value as FontSize)}><option value="small">小</option><option value="standard">标准</option><option value="large">大</option></select></label><div className="menu-divider"/><button onClick={() => importInput.current?.click()}>导入 ICS 日历</button><button onClick={() => void toggleAutostart()}>开机自启：{autostart ? "开" : "关"}</button><small className="menu-footnote">设置与数据仅保存在本机</small></div>}</span><span className="toolbar-divider" aria-hidden="true"/><button className="add-button" onClick={() => openCreate(filter === "meeting" ? "meeting" : "task")} aria-label="新增事项"><Plus size={19}/></button>
         <input ref={importInput} className="visually-hidden" type="file" accept=".ics,text/calendar" onChange={(event) => void importIcsFile(event.target.files?.[0])}/>
       </div>
     </header>
     <nav className="filters" aria-label="事项筛选"><button className={filter === "all" ? "active" : ""} aria-pressed={filter === "all"} onClick={() => setFilter("all")}><CalendarDays size={15}/>全部<span>{counts.task + counts.meeting}</span></button><button className={filter === "task" ? "active" : ""} aria-pressed={filter === "task"} onClick={() => setFilter("task")}><BriefcaseBusiness size={15}/>工作清单<span>{counts.task}</span></button><button className={filter === "meeting" ? "active" : ""} aria-pressed={filter === "meeting"} onClick={() => setFilter("meeting")}><BellRing size={15}/>会议<span>{counts.meeting}</span></button></nav>
     <section className={`calendar-panel ${viewMode}`}><div className="view-tabs" aria-label="日历视图"><button className={viewMode === "week" ? "active" : ""} aria-pressed={viewMode === "week"} onClick={() => chooseView("week")}>周</button><button className={viewMode === "month" ? "active" : ""} aria-pressed={viewMode === "month"} onClick={() => chooseView("month")}>月</button></div><div className="calendar-toolbar"><button onClick={() => navigateCalendar(-1)} aria-label={viewMode === "week" ? "上一周" : "上个月"}><ChevronLeft size={15}/></button><button className="calendar-title" onClick={() => { const today = new Date(); setCalendarAnchor(today); setSelectedDate(today); }}>{calendarTitle}</button><button onClick={() => navigateCalendar(1)} aria-label={viewMode === "week" ? "下一周" : "下个月"}><ChevronRight size={15}/></button></div><div className="calendar-grid">{days.map((day) => { const dayItems = itemsForDate(items, day); return <button key={dateKey(day)} className={`${isSameDay(day, selectedDate) ? "selected" : ""} ${isToday(day) ? "today" : ""} ${viewMode === "month" && !isSameMonth(day, calendarAnchor) ? "outside-month" : ""}`} onClick={() => setSelectedDate(day)}><span>{format(day, "EEE", { locale: zhCN })}</span><strong>{format(day, "d")}</strong><i>{dayItems.length > 0 && Math.min(dayItems.length, 9)}</i></button>; })}</div></section>
-    <section className="agenda"><div className="agenda-heading"><div><span className="eyebrow">{isToday(selectedDate) ? "今天" : format(selectedDate, "EEEE")}</span><h2>{format(selectedDate, "M月d日")}</h2></div><span>{visible.length} 项安排</span></div><div className="item-list" role="region" aria-label={`${format(selectedDate, "M月d日")}待办列表`} tabIndex={0}>{loading ? <div className="empty-state">正在加载本地数据…</div> : visible.length ? visible.map((item) => <ItemCard key={item.id} item={item} autoExpand={focusedItemId === item.id} onChange={persist} onDelete={remove} onEdit={openEdit}/>) : <div className="empty-state"><span className="empty-icon"><Check size={25}/></span><strong>这一天很清爽</strong><p>没有安排，留一点时间给自己。</p><button onClick={() => openCreate(filter === "meeting" ? "meeting" : "task")}><Plus size={15}/>添加事项</button></div>}</div></section>
+    <section className="agenda"><div className="agenda-heading"><div><span className="eyebrow">{isToday(selectedDate) ? "今天" : format(selectedDate, "EEEE")}</span><h2>{format(selectedDate, "M月d日")}</h2></div><span>{visible.length} 项安排</span></div><div className="item-list" role="region" aria-label={`${format(selectedDate, "M月d日")}待办列表`} tabIndex={0}>{loading ? <div className="empty-state">正在加载本地数据…</div> : visible.length ? visible.map((item) => <ItemCard key={item.id} item={item} autoExpand={focusedItemId === item.id} onChange={persistOccurrence} onDelete={remove} onEdit={openEdit}/>) : <div className="empty-state"><span className="empty-icon"><Check size={25}/></span><strong>这一天很清爽</strong><p>没有安排，留一点时间给自己。</p><button onClick={() => openCreate(filter === "meeting" ? "meeting" : "task")}><Plus size={15}/>添加事项</button></div>}</div></section>
     {formType && <ItemForm key={editingItem?.id ?? `new-${formType}`} date={selectedDate} initialType={formType} initialItem={editingItem ?? undefined} onClose={closeForm} onSave={persist}/>} {notice && <div className="toast" role="status">{notice}</div>}
   </main>;
 }

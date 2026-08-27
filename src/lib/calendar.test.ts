@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dateKey, itemsForDate, isOverdue, monthDays, weekDays } from "./calendar";
+import { dateKey, itemOccurrenceForDate, itemsForDate, isOverdue, monthDays, weekDays } from "./calendar";
 import type { TodoItem } from "../types";
 
 const item = (overrides: Partial<TodoItem> = {}): TodoItem => ({
@@ -35,6 +35,15 @@ describe("calendar", () => {
   it("按任务截止日期筛选", () => {
     expect(itemsForDate([item()], new Date(2026, 7, 18, 12))).toHaveLength(1);
     expect(itemsForDate([item()], new Date(2026, 7, 19, 12))).toHaveLength(0);
+  });
+  it("每周任务从开始日期起出现在一个或多个所选星期", () => {
+    const recurring = item({ taskSchedule: { mode: "weekly", startsOn: "2026-08-18", weekdays: [1, 3] }, completedDates: ["2026-08-19"] });
+    expect(itemsForDate([recurring], new Date(2026, 7, 17))).toHaveLength(0);
+    expect(itemsForDate([recurring], new Date(2026, 7, 19))).toHaveLength(1);
+    expect(itemsForDate([recurring], new Date(2026, 7, 24))).toHaveLength(1);
+    expect(itemsForDate([recurring], new Date(2026, 7, 25))).toHaveLength(0);
+    expect(itemOccurrenceForDate(recurring, new Date(2026, 7, 19)).completed).toBe(true);
+    expect(itemOccurrenceForDate(recurring, new Date(2026, 7, 24)).completed).toBe(false);
   });
   it("已完成任务不会标记逾期", () => {
     expect(isOverdue(item(), new Date("2026-08-20T12:00:00Z"))).toBe(true);

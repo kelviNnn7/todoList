@@ -1,8 +1,10 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
+import { format, getISODay } from "date-fns";
 import App from "./App";
 import { scopedStorageKey } from "./lib/scopedStorage";
+import type { TodoItem } from "./types";
 
 describe("App", () => {
   beforeEach(() => localStorage.clear());
@@ -39,6 +41,37 @@ describe("App", () => {
     expect(container.querySelector("main")).toHaveAttribute("style", expect.stringContaining("--widget-opacity: 0.75"));
     expect(localStorage.getItem(scopedStorageKey("desktopWidget"))).toBe("true");
     expect(localStorage.getItem(scopedStorageKey("appearanceOpacity"))).toBe("75");
+  });
+  it("可以调节并持久化字体大小", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App/>);
+    await user.click(screen.getByRole("button", { name: "更多选项" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "字体大小" }), "large");
+    expect(container.querySelector("main")).toHaveAttribute("style", expect.stringContaining("--font-scale: 1.12"));
+    expect(localStorage.getItem(scopedStorageKey("appearanceFontSize"))).toBe("large");
+  });
+  it("点击设置栏外部时自动收起设置栏", async () => {
+    const user = userEvent.setup(); render(<App/>);
+    await user.click(screen.getByRole("button", { name: "更多选项" }));
+    expect(screen.getByRole("dialog", { name: "更多设置" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "新增事项" }));
+    expect(screen.queryByRole("dialog", { name: "更多设置" })).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "安排你的下一步" })).toBeInTheDocument();
+  });
+  it("每周任务按日期独立保存完成状态", async () => {
+    const today = new Date(); const key = format(today, "yyyy-MM-dd");
+    const recurring: TodoItem = {
+      id: "weekly-task", type: "task", title: "每周整理", notes: "", startAt: null, endAt: null,
+      dueAt: new Date(`${key}T23:59:59`).toISOString(), location: "", meetingUrl: "", reminderMinutes: null,
+      reminderSentAt: null, reminderAt: null, reminderStatus: "none", snoozeCount: 0, lastReminderAt: null,
+      completed: false, source: "local", subtasks: [], taskSchedule: { mode: "weekly", startsOn: key, weekdays: [getISODay(today)] }, completedDates: [],
+      createdAt: today.toISOString(), updatedAt: today.toISOString(),
+    };
+    localStorage.setItem(scopedStorageKey("items.v1"), JSON.stringify([recurring]));
+    const user = userEvent.setup(); render(<App/>);
+    expect(await screen.findByText("每周整理")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "标记为完成" }));
+    await waitFor(() => expect(JSON.parse(localStorage.getItem(scopedStorageKey("items.v1")) ?? "[]")[0].completedDates).toContain(key));
   });
   it("展开窗口后待办与日历固定为等宽双栏", async () => {
     const user = userEvent.setup();

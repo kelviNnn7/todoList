@@ -3,6 +3,12 @@ import WidgetKit
 
 private let appGroup = "group.com.todo.desktop"
 
+struct WeeklyTaskSchedule: Codable {
+    let mode: String
+    let startsOn: String
+    let weekdays: [Int]
+}
+
 struct SharedItem: Codable, Identifiable {
     let id: String
     let type: String
@@ -11,9 +17,28 @@ struct SharedItem: Codable, Identifiable {
     let startAt: String?
     let dueAt: String?
     let completed: Bool
+    let taskSchedule: WeeklyTaskSchedule?
+    let completedDates: [String]?
 
     var date: Date? {
         ISO8601DateFormatter().date(from: type == "meeting" ? (startAt ?? "") : (dueAt ?? ""))
+    }
+
+    func isActive(on date: Date, calendar: Calendar) -> Bool {
+        guard type == "task", taskSchedule?.mode == "weekly", let schedule = taskSchedule else { return !completed }
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        let key = formatter.string(from: date)
+        let systemWeekday = calendar.component(.weekday, from: date)
+        let isoWeekday = systemWeekday == 1 ? 7 : systemWeekday - 1
+        return key >= schedule.startsOn && schedule.weekdays.contains(isoWeekday) && !(completedDates ?? []).contains(key)
+    }
+
+    func isScheduled(on date: Date, calendar: Calendar) -> Bool {
+        guard type == "task", taskSchedule?.mode == "weekly" else { return self.date.map { calendar.isDate($0, inSameDayAs: date) } ?? false }
+        return isActive(on: date, calendar: calendar)
     }
 }
 
@@ -33,7 +58,7 @@ struct WidgetEntry: TimelineEntry {
 
 struct WidgetProvider: TimelineProvider {
     func placeholder(in context: Context) -> WidgetEntry {
-        WidgetEntry(date: Date(), opacity: 95, tasks: [SharedItem(id: "sample", type: "task", title: "完成今日计划", notes: nil, startAt: nil, dueAt: nil, completed: false)], meeting: nil)
+        WidgetEntry(date: Date(), opacity: 95, tasks: [SharedItem(id: "sample", type: "task", title: "完成今日计划", notes: nil, startAt: nil, dueAt: nil, completed: false, taskSchedule: nil, completedDates: nil)], meeting: nil)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (WidgetEntry) -> Void) {
@@ -48,8 +73,8 @@ struct WidgetProvider: TimelineProvider {
     private func entry() -> WidgetEntry {
         let snapshot = loadSnapshot()
         let calendar = Calendar.current
-        let active = snapshot.items.filter { !$0.completed }
-        let tasks = active.filter { $0.type == "task" && ($0.date.map(calendar.isDateInToday) ?? false) }
+        let active = snapshot.items.filter { $0.type == "task" ? $0.isActive(on: Date(), calendar: calendar) : !$0.completed }
+        let tasks = active.filter { $0.type == "task" && $0.isScheduled(on: Date(), calendar: calendar) }
             .sorted { ($0.date ?? .distantFuture) < ($1.date ?? .distantFuture) }
         let meeting = active.filter { $0.type == "meeting" && ($0.date.map(calendar.isDateInToday) ?? false) }
             .sorted { ($0.date ?? .distantFuture) < ($1.date ?? .distantFuture) }.first

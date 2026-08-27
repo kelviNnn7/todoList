@@ -31,7 +31,8 @@ codesign --verify --deep --strict --verbose=2 "$app_path"
 
 architecture="$(uname -m)"
 output_dir="src-tauri/target/release/bundle/dmg"
-output_path="$output_dir/BluNote_0.2.4_${architecture}.dmg"
+version="$(node -p "require('./package.json').version")"
+output_path="$output_dir/BluNote_${version}_${architecture}.dmg"
 staging="$(mktemp -d)"
 trap 'rm -rf "$staging"' EXIT
 cp -R "$app_path" "$staging/"

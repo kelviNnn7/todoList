@@ -23,6 +23,25 @@ const meeting: TodoItem = {
 };
 
 describe("ItemForm editing", () => {
+  it("新增任务时可选择每周并多选星期", async () => {
+    const user = userEvent.setup(); const onSave = vi.fn().mockResolvedValue(undefined);
+    render(<ItemForm date={new Date(2026, 7, 27)} initialType="task" onClose={vi.fn()} onSave={onSave}/>);
+
+    await user.type(screen.getByLabelText("标题"), "每周复盘");
+    await user.click(screen.getByRole("button", { name: "每周" }));
+    await user.click(screen.getByRole("button", { name: "星期一" }));
+    await user.click(screen.getByRole("button", { name: "星期三" }));
+    await user.click(screen.getByRole("button", { name: "星期四" }));
+    await user.click(screen.getByRole("button", { name: "保存事项" }));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      title: "每周复盘",
+      taskSchedule: { mode: "weekly", startsOn: "2026-08-27", weekdays: [1, 3] },
+      completedDates: [],
+      reminderAt: null,
+    }));
+  });
+
   it("回填并更新任务，同时保留事项、子任务和提醒状态", async () => {
     const user = userEvent.setup(); const onSave = vi.fn().mockResolvedValue(undefined);
     render(<ItemForm date={new Date()} initialType="task" initialItem={task} onClose={vi.fn()} onSave={onSave}/>);

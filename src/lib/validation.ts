@@ -23,6 +23,10 @@ export function validateDraft(draft: ItemDraft): ValidationErrors {
   if (draft.type === "task" && draft.taskReminderAt && Number.isNaN(new Date(draft.taskReminderAt).getTime())) {
     errors.reminderAt = "任务提醒时间格式不正确";
   }
+  if (draft.type === "task" && !draft.date) errors.date = "请选择任务日期";
+  if (draft.type === "task" && draft.taskScheduleMode === "weekly" && draft.repeatWeekdays.length === 0) {
+    errors.repeatWeekdays = "请至少选择一个重复日期";
+  }
 
   if (draft.subtasks.some((subtask) => !subtask.title.trim())) errors.subtasks = "子任务标题不能为空";
   const parentDue = draft.date ? new Date(`${draft.date}T23:59:59`).getTime() : null;

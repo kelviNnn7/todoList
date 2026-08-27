@@ -19,11 +19,26 @@ export function itemDate(item: TodoItem): Date | null {
   return value ? parseISO(value) : null;
 }
 
-export function itemsForDate(items: TodoItem[], date: Date): TodoItem[] {
-  return items.filter((item) => {
+function isoWeekday(date: Date): number {
+  return date.getDay() || 7;
+}
+
+export function isItemScheduledForDate(item: TodoItem, date: Date): boolean {
+  if (item.type !== "task" || item.taskSchedule?.mode !== "weekly") {
     const target = itemDate(item);
-    return target && isSameDay(target, date);
-  });
+    return Boolean(target && isSameDay(target, date));
+  }
+  return dateKey(date) >= item.taskSchedule.startsOn && item.taskSchedule.weekdays.includes(isoWeekday(date));
+}
+
+export function itemOccurrenceForDate(item: TodoItem, date: Date): TodoItem {
+  if (item.type !== "task" || item.taskSchedule?.mode !== "weekly") return item;
+  const occurrenceDate = dateKey(date);
+  return { ...item, dueAt: new Date(`${occurrenceDate}T23:59:59`).toISOString(), completed: (item.completedDates ?? []).includes(occurrenceDate) };
+}
+
+export function itemsForDate(items: TodoItem[], date: Date): TodoItem[] {
+  return items.filter((item) => isItemScheduledForDate(item, date));
 }
 
 export function isOverdue(item: TodoItem, now = new Date()): boolean {

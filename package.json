@@ -1,7 +1,7 @@
 {
   "name": "desktop-todo-widget",
   "private": true,
-  "version": "0.2.4",
+  "version": "0.3.0",
   "description": "跨平台桌面待办与会议挂件",
   "desktopName": "com.todo.desktop",
   "license": "MIT",
@@ -61,18 +61,43 @@
     "productName": "BluNote",
     "artifactName": "BluNote-${version}-kylin-v10-${arch}.${ext}",
     "asar": true,
-    "protocols": [{ "name": "Todo Widget Link", "schemes": ["todo-widget"] }],
-    "directories": { "output": "release/kylin-v10-build" },
-    "files": ["dist/**/*", "electron/**/*", "src-tauri/icons/icon.png", "src-tauri/icons/32x32.png"],
+    "protocols": [
+      {
+        "name": "Todo Widget Link",
+        "schemes": [
+          "todo-widget"
+        ]
+      }
+    ],
+    "directories": {
+      "output": "release/kylin-v10-build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "src-tauri/icons/icon.png",
+      "src-tauri/icons/32x32.png"
+    ],
     "linux": {
-      "target": ["deb"],
+      "target": [
+        "deb"
+      ],
       "category": "Utility",
       "icon": "src-tauri/icons/icon.png",
       "executableName": "desktop-todo",
       "syncDesktopName": true
     },
     "deb": {
-      "depends": ["libgtk-3-0", "libnotify4", "libnss3", "libxss1", "libxtst6", "xdg-utils", "libatspi2.0-0", "libuuid1"]
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libuuid1"
+      ]
     }
   }
 }

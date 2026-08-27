@@ -8,7 +8,7 @@ const legacyStorageKey = (name: string) => `${["pin", "do"].join("")}.${name}`;
 const makeItem = (id: string, title = "本地任务"): TodoItem => ({
   id, type: "task", title, notes: "", startAt: null, endAt: null, dueAt: null, location: "", meetingUrl: "",
   reminderMinutes: null, reminderSentAt: null, reminderAt: null, reminderStatus: "none", snoozeCount: 0, lastReminderAt: null,
-  completed: false, source: "local", subtasks: [], createdAt: "2026-08-18T00:00:00.000Z", updatedAt: "2026-08-18T00:00:00.000Z",
+  completed: false, source: "local", subtasks: [], taskSchedule: null, completedDates: [], createdAt: "2026-08-18T00:00:00.000Z", updatedAt: "2026-08-18T00:00:00.000Z",
 });
 
 describe("storage browser fallback", () => {
