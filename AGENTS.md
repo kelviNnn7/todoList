@@ -4,3 +4,4 @@
 - Product or brand names may appear only in user-visible copy, installer metadata, release artifact names, and product documentation.
 - Isolate compatibility with historical identifiers inside explicitly named migration helpers. Do not reuse historical naming in new business logic.
 - Run the repository-wide naming scan and the full test/build checks before committing a refactor or feature.
+- Before any feature or functional change is pushed or merged to `main`, update `docs/BluNote-v1.0-产品需求文档.md` in the same change. Record the requirement/iteration mapping, implementation status, document update date, document revision, and application version. A functional `main` update without this documentation is not permitted.
