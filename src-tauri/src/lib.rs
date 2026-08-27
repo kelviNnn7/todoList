@@ -16,10 +16,13 @@ use tauri::{
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
+#[cfg(any(target_os = "macos", test))]
 const APP_BUNDLE_IDENTIFIER: &str = "com.todo.desktop";
+#[cfg(target_os = "macos")]
 const APP_GROUP_IDENTIFIER: &str = "group.com.todo.desktop";
 const APP_URL_SCHEME: &str = "todo-widget";
 const DATA_FILE_NAME: &str = "todo.db";
+#[cfg(target_os = "macos")]
 const WIDGET_RELOADER_NAME: &str = "WidgetReloader";
 
 struct DatabaseState(Mutex<Connection>);
