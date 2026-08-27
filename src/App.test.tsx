@@ -42,13 +42,20 @@ describe("App", () => {
     expect(localStorage.getItem(scopedStorageKey("desktopWidget"))).toBe("true");
     expect(localStorage.getItem(scopedStorageKey("appearanceOpacity"))).toBe("75");
   });
-  it("可以调节并持久化字体大小", async () => {
+  it("可以通过四档滑杆调节并持久化字体大小", async () => {
     const user = userEvent.setup();
     const { container } = render(<App/>);
+    expect(container.querySelector("main")).toHaveAttribute("style", expect.stringContaining("--font-scale: 1"));
     await user.click(screen.getByRole("button", { name: "更多选项" }));
-    await user.selectOptions(screen.getByRole("combobox", { name: "字体大小" }), "large");
-    expect(container.querySelector("main")).toHaveAttribute("style", expect.stringContaining("--font-scale: 1.12"));
-    expect(localStorage.getItem(scopedStorageKey("appearanceFontSize"))).toBe("large");
+    expect(screen.getByText("1 档 · 100%")).toBeInTheDocument();
+    const slider = screen.getByRole("slider", { name: "字体大小" });
+    expect(slider).toHaveAttribute("min", "1");
+    expect(slider).toHaveAttribute("max", "4");
+    expect(slider).toHaveAttribute("step", "1");
+    fireEvent.change(slider, { target: { value: "4" } });
+    expect(container.querySelector("main")).toHaveAttribute("style", expect.stringContaining("--font-scale: 1.45"));
+    expect(screen.getByText("4 档 · 145%")).toBeInTheDocument();
+    expect(localStorage.getItem(scopedStorageKey("appearanceFontSize"))).toBe("4");
   });
   it("点击设置栏外部时自动收起设置栏", async () => {
     const user = userEvent.setup(); render(<App/>);

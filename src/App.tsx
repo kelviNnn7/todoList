@@ -14,7 +14,7 @@ import type { CalendarViewMode, FilterType, ItemType, TodoItem } from "./types";
 import appIcon from "./assets/app-icon.png";
 
 type ResizeDirection = "East" | "North" | "NorthEast" | "NorthWest" | "South" | "SouthEast" | "SouthWest" | "West";
-type FontSize = "small" | "standard" | "large";
+type FontLevel = 1 | 2 | 3 | 4;
 
 const savedOpacity = () => {
   const value = Number(readScopedValue("appearanceOpacity"));
@@ -24,11 +24,14 @@ const savedView = (expanded: boolean): CalendarViewMode => {
   const value = readScopedValue(`calendarView.${expanded ? "expanded" : "widget"}`);
   return value === "week" || value === "month" ? value : expanded ? "month" : "week";
 };
-const savedFontSize = (): FontSize => {
+const savedFontLevel = (): FontLevel => {
   const value = readScopedValue("appearanceFontSize");
-  return value === "small" || value === "large" ? value : "standard";
+  if (value === "2" || value === "large") return 2;
+  if (value === "3") return 3;
+  if (value === "4") return 4;
+  return 1;
 };
-const fontScale: Record<FontSize, number> = { small: 0.9, standard: 1, large: 1.12 };
+const fontScale: Record<FontLevel, number> = { 1: 1, 2: 1.15, 3: 1.3, 4: 1.45 };
 const resizeDirections: ResizeDirection[] = ["North", "NorthEast", "East", "SouthEast", "South", "SouthWest", "West", "NorthWest"];
 export default function App() {
   const [items, setItems] = useState<TodoItem[]>([]);
@@ -46,7 +49,7 @@ export default function App() {
   const [autostart, setAutostart] = useState(false);
   const [desktopWidget, setDesktopWidget] = useState(() => readScopedValue("desktopWidget") === "true");
   const [appearanceOpacity, setAppearanceOpacity] = useState(savedOpacity);
-  const [appearanceFontSize, setAppearanceFontSize] = useState<FontSize>(savedFontSize);
+  const [appearanceFontLevel, setAppearanceFontLevel] = useState<FontLevel>(savedFontLevel);
   const [menuOpen, setMenuOpen] = useState(false);
   const [notice, setNotice] = useState("");
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
@@ -191,7 +194,7 @@ export default function App() {
     setNotice(next ? "已切换为桌面小组件" : "已恢复普通窗口模式"); window.setTimeout(() => setNotice(""), 2200);
   }
   function updateAppearanceOpacity(value: number) { const next = Math.min(100, Math.max(55, value)); setAppearanceOpacity(next); writeScopedValue("appearanceOpacity", String(next)); }
-  function updateAppearanceFontSize(value: FontSize) { setAppearanceFontSize(value); writeScopedValue("appearanceFontSize", value); }
+  function updateAppearanceFontLevel(value: number) { const next = Math.min(4, Math.max(1, Math.round(value))) as FontLevel; setAppearanceFontLevel(next); writeScopedValue("appearanceFontSize", String(next)); }
   async function importIcsFile(file: File | undefined) {
     if (!file) return;
     try { const imported = parseIcs(await file.text()); for (const item of imported) await saveItem(item); setItems((current) => [...imported, ...current.filter((item) => !imported.some((value) => value.id === item.id))]); setNotice(`已导入 ${imported.length} 场会议`); }
@@ -224,13 +227,13 @@ export default function App() {
     if (!isDesktopRuntime()) return;
     void startDragging().catch(() => setNotice("窗口拖动启动失败，请重试"));
   }
-  return <main className={`app-shell ${isElectronRuntime() ? "runtime-electron" : ""} ${expandedWindow ? "expanded" : ""} ${desktopWidget ? "desktop-widget" : ""} ${locked ? "position-locked" : ""} ${dragging ? "dragging" : ""}`} style={{ "--widget-opacity": appearanceOpacity / 100, "--font-scale": fontScale[appearanceFontSize] } as React.CSSProperties}>
+  return <main className={`app-shell ${isElectronRuntime() ? "runtime-electron" : ""} ${expandedWindow ? "expanded" : ""} ${desktopWidget ? "desktop-widget" : ""} ${locked ? "position-locked" : ""} ${dragging ? "dragging" : ""}`} style={{ "--widget-opacity": appearanceOpacity / 100, "--font-scale": fontScale[appearanceFontLevel] } as React.CSSProperties}>
     {resizeDirections.map((direction) => <div key={direction} className={`window-resize-handle resize-${direction.toLowerCase()}`} aria-hidden="true" onPointerDown={(event) => startWindowResize(direction, event)}/>)}
     <div className="drag-region" onMouseDown={startWindowDrag}/>
     <header className="topbar" onMouseDown={startWindowDrag}>
       <div className="date-heading"><span className="brand-line"><img className="app-glyph" src={appIcon} alt=""/>BluNote</span><h1>{longDate(new Date())}</h1></div>
       <div className="top-actions"><button className="icon-button" aria-label={locked ? "解锁位置" : "锁定位置"} title={locked ? "解锁位置" : "锁定位置"} onClick={toggleLock}>{locked ? <Lock size={17}/> : <Unlock size={17}/>}</button><button className="icon-button" aria-label={expandedWindow ? "收起挂件" : "展开窗口"} title={expandedWindow ? "收起挂件" : "展开窗口"} onClick={toggleWindow}>{expandedWindow ? <Minimize2 size={17}/> : <Expand size={17}/>}</button><span className="menu-container" ref={menuContainer}><button className={`icon-button ${menuOpen ? "pressed" : ""}`} aria-label="更多选项" title="更多选项" aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)}><Ellipsis size={19}/></button>
-        {menuOpen && <div className="app-menu" role="dialog" aria-label="更多设置"><span className="menu-title">小组件</span><label className="menu-setting"><span><strong>桌面小组件</strong><small>驻留桌面，不遮挡其他窗口</small></span><input type="checkbox" checked={desktopWidget} onChange={() => void toggleDesktopWidget()}/><i aria-hidden="true"/></label><label className="menu-setting"><span><strong>锁定位置</strong><small>防止意外拖动挂件</small></span><input type="checkbox" checked={locked} onChange={() => void toggleLock()}/><i aria-hidden="true"/></label><label className="menu-setting"><span><strong>边缘吸附</strong><small>靠近屏幕边缘 8px 自动贴合</small></span><input type="checkbox" checked={edgeSnap} onChange={toggleEdgeSnap}/><i aria-hidden="true"/></label><label className="opacity-setting"><span>外观透明度<output>{appearanceOpacity}%</output></span><input aria-label="外观透明度" type="range" min="55" max="100" step="5" value={appearanceOpacity} onChange={(event) => updateAppearanceOpacity(Number(event.target.value))}/></label><label className="font-size-setting"><span>字体大小</span><select aria-label="字体大小" value={appearanceFontSize} onChange={(event) => updateAppearanceFontSize(event.target.value as FontSize)}><option value="small">小</option><option value="standard">标准</option><option value="large">大</option></select></label><div className="menu-divider"/><button onClick={() => importInput.current?.click()}>导入 ICS 日历</button><button onClick={() => void toggleAutostart()}>开机自启：{autostart ? "开" : "关"}</button><small className="menu-footnote">设置与数据仅保存在本机</small></div>}</span><span className="toolbar-divider" aria-hidden="true"/><button className="add-button" onClick={() => openCreate(filter === "meeting" ? "meeting" : "task")} aria-label="新增事项"><Plus size={19}/></button>
+        {menuOpen && <div className="app-menu" role="dialog" aria-label="更多设置"><span className="menu-title">小组件</span><label className="menu-setting"><span><strong>桌面小组件</strong><small>驻留桌面，不遮挡其他窗口</small></span><input type="checkbox" checked={desktopWidget} onChange={() => void toggleDesktopWidget()}/><i aria-hidden="true"/></label><label className="menu-setting"><span><strong>锁定位置</strong><small>防止意外拖动挂件</small></span><input type="checkbox" checked={locked} onChange={() => void toggleLock()}/><i aria-hidden="true"/></label><label className="menu-setting"><span><strong>边缘吸附</strong><small>靠近屏幕边缘 8px 自动贴合</small></span><input type="checkbox" checked={edgeSnap} onChange={toggleEdgeSnap}/><i aria-hidden="true"/></label><label className="opacity-setting"><span>外观透明度<output>{appearanceOpacity}%</output></span><input aria-label="外观透明度" type="range" min="55" max="100" step="5" value={appearanceOpacity} onChange={(event) => updateAppearanceOpacity(Number(event.target.value))}/></label><label className="font-size-setting"><span>字体大小<output>{appearanceFontLevel} 档 · {Math.round(fontScale[appearanceFontLevel] * 100)}%</output></span><input aria-label="字体大小" aria-valuetext={`${appearanceFontLevel} 档，${Math.round(fontScale[appearanceFontLevel] * 100)}%`} type="range" min="1" max="4" step="1" value={appearanceFontLevel} onChange={(event) => updateAppearanceFontLevel(Number(event.target.value))}/><span className="font-scale-ticks" aria-hidden="true"><i>1</i><i>2</i><i>3</i><i>4</i></span></label><div className="menu-divider"/><button onClick={() => importInput.current?.click()}>导入 ICS 日历</button><button onClick={() => void toggleAutostart()}>开机自启：{autostart ? "开" : "关"}</button><small className="menu-footnote">设置与数据仅保存在本机</small></div>}</span><span className="toolbar-divider" aria-hidden="true"/><button className="add-button" onClick={() => openCreate(filter === "meeting" ? "meeting" : "task")} aria-label="新增事项"><Plus size={19}/></button>
         <input ref={importInput} className="visually-hidden" type="file" accept=".ics,text/calendar" onChange={(event) => void importIcsFile(event.target.files?.[0])}/>
       </div>
     </header>
