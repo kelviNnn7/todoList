@@ -1,7 +1,7 @@
 {
   "name": "desktop-todo-widget",
   "private": true,
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "跨平台桌面待办与会议挂件",
   "desktopName": "com.todo.desktop",
   "license": "MIT",

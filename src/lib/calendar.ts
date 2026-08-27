@@ -41,6 +41,13 @@ export function itemsForDate(items: TodoItem[], date: Date): TodoItem[] {
   return items.filter((item) => isItemScheduledForDate(item, date));
 }
 
+export function calendarBadgeCount(items: TodoItem[], date: Date, now = new Date()): number {
+  return itemsForDate(items, date).filter((item) => {
+    if (item.type === "task") return !itemOccurrenceForDate(item, date).completed;
+    return Boolean(!item.completed && item.startAt && parseISO(item.startAt).getTime() > now.getTime());
+  }).length;
+}
+
 export function isOverdue(item: TodoItem, now = new Date()): boolean {
   const target = itemDate(item);
   return Boolean(target && !item.completed && isBefore(target, startOfDay(now)));

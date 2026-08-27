@@ -4,7 +4,7 @@ import { zhCN } from "date-fns/locale";
 import { BellRing, BriefcaseBusiness, CalendarDays, Check, ChevronLeft, ChevronRight, Ellipsis, Expand, Lock, Minimize2, Plus, Unlock } from "lucide-react";
 import { ItemCard } from "./components/ItemCard";
 import { ItemForm } from "./components/ItemForm";
-import { dateKey, itemDate, itemOccurrenceForDate, itemsForDate, longDate, monthDays, sortItems, weekDays } from "./lib/calendar";
+import { calendarBadgeCount, dateKey, itemDate, itemOccurrenceForDate, itemsForDate, longDate, monthDays, sortItems, weekDays } from "./lib/calendar";
 import { parseIcs } from "./lib/ics";
 import { isTaskReminderDue, markReminderFired, quickSnoozeAt, snoozeTask, type QuickSnooze } from "./lib/reminders";
 import { deleteItem, loadItems, saveItem } from "./lib/storage";
@@ -37,6 +37,7 @@ export default function App() {
   const [items, setItems] = useState<TodoItem[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [calendarAnchor, setCalendarAnchor] = useState(new Date());
+  const [calendarNow, setCalendarNow] = useState(new Date());
   const [viewMode, setViewMode] = useState<CalendarViewMode>(() => savedView(false));
   const [filter, setFilter] = useState<FilterType>("all");
   const [formType, setFormType] = useState<ItemType | null>(null);
@@ -149,9 +150,10 @@ export default function App() {
   }, [persist]);
 
   useEffect(() => {
-    if (!isDesktopRuntime()) return;
     const scan = async () => {
       const now = new Date();
+      setCalendarNow(now);
+      if (!isDesktopRuntime()) return;
       for (const item of itemsRef.current) {
         if (item.type === "meeting" && !item.completed && item.startAt && item.reminderMinutes != null && !item.reminderSentAt) {
           const triggerAt = new Date(item.startAt).getTime() - item.reminderMinutes * 60_000;
@@ -238,7 +240,7 @@ export default function App() {
       </div>
     </header>
     <nav className="filters" aria-label="事项筛选"><button className={filter === "all" ? "active" : ""} aria-pressed={filter === "all"} onClick={() => setFilter("all")}><CalendarDays size={15}/>全部<span>{counts.task + counts.meeting}</span></button><button className={filter === "task" ? "active" : ""} aria-pressed={filter === "task"} onClick={() => setFilter("task")}><BriefcaseBusiness size={15}/>工作清单<span>{counts.task}</span></button><button className={filter === "meeting" ? "active" : ""} aria-pressed={filter === "meeting"} onClick={() => setFilter("meeting")}><BellRing size={15}/>会议<span>{counts.meeting}</span></button></nav>
-    <section className={`calendar-panel ${viewMode}`}><div className="view-tabs" aria-label="日历视图"><button className={viewMode === "week" ? "active" : ""} aria-pressed={viewMode === "week"} onClick={() => chooseView("week")}>周</button><button className={viewMode === "month" ? "active" : ""} aria-pressed={viewMode === "month"} onClick={() => chooseView("month")}>月</button></div><div className="calendar-toolbar"><button onClick={() => navigateCalendar(-1)} aria-label={viewMode === "week" ? "上一周" : "上个月"}><ChevronLeft size={15}/></button><button className="calendar-title" onClick={() => { const today = new Date(); setCalendarAnchor(today); setSelectedDate(today); }}>{calendarTitle}</button><button onClick={() => navigateCalendar(1)} aria-label={viewMode === "week" ? "下一周" : "下个月"}><ChevronRight size={15}/></button></div><div className="calendar-grid">{days.map((day) => { const dayItems = itemsForDate(items, day); return <button key={dateKey(day)} className={`${isSameDay(day, selectedDate) ? "selected" : ""} ${isToday(day) ? "today" : ""} ${viewMode === "month" && !isSameMonth(day, calendarAnchor) ? "outside-month" : ""}`} onClick={() => setSelectedDate(day)}><span>{format(day, "EEE", { locale: zhCN })}</span><strong>{format(day, "d")}</strong><i>{dayItems.length > 0 && Math.min(dayItems.length, 9)}</i></button>; })}</div></section>
+    <section className={`calendar-panel ${viewMode}`}><div className="view-tabs" aria-label="日历视图"><button className={viewMode === "week" ? "active" : ""} aria-pressed={viewMode === "week"} onClick={() => chooseView("week")}>周</button><button className={viewMode === "month" ? "active" : ""} aria-pressed={viewMode === "month"} onClick={() => chooseView("month")}>月</button></div><div className="calendar-toolbar"><button onClick={() => navigateCalendar(-1)} aria-label={viewMode === "week" ? "上一周" : "上个月"}><ChevronLeft size={15}/></button><button className="calendar-title" onClick={() => { const today = new Date(); setCalendarAnchor(today); setSelectedDate(today); }}>{calendarTitle}</button><button onClick={() => navigateCalendar(1)} aria-label={viewMode === "week" ? "下一周" : "下个月"}><ChevronRight size={15}/></button></div><div className="calendar-grid">{days.map((day) => { const badgeCount = calendarBadgeCount(items, day, calendarNow); return <button key={dateKey(day)} className={`${isSameDay(day, selectedDate) ? "selected" : ""} ${isToday(day) ? "today" : ""} ${viewMode === "month" && !isSameMonth(day, calendarAnchor) ? "outside-month" : ""}`} onClick={() => setSelectedDate(day)}><span>{format(day, "EEE", { locale: zhCN })}</span><strong>{format(day, "d")}</strong><i>{badgeCount > 0 && Math.min(badgeCount, 9)}</i></button>; })}</div></section>
     <section className="agenda"><div className="agenda-heading"><div><span className="eyebrow">{isToday(selectedDate) ? "今天" : format(selectedDate, "EEEE")}</span><h2>{format(selectedDate, "M月d日")}</h2></div><span>{visible.length} 项安排</span></div><div className="item-list" role="region" aria-label={`${format(selectedDate, "M月d日")}待办列表`} tabIndex={0}>{loading ? <div className="empty-state">正在加载本地数据…</div> : visible.length ? visible.map((item) => <ItemCard key={item.id} item={item} autoExpand={focusedItemId === item.id} onChange={persistOccurrence} onDelete={remove} onEdit={openEdit}/>) : <div className="empty-state"><span className="empty-icon"><Check size={25}/></span><strong>这一天很清爽</strong><p>没有安排，留一点时间给自己。</p><button onClick={() => openCreate(filter === "meeting" ? "meeting" : "task")}><Plus size={15}/>添加事项</button></div>}</div></section>
     {formType && <ItemForm key={editingItem?.id ?? `new-${formType}`} date={selectedDate} initialType={formType} initialItem={editingItem ?? undefined} onClose={closeForm} onSave={persist}/>} {notice && <div className="toast" role="status">{notice}</div>}
   </main>;

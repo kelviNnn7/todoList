@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dateKey, itemOccurrenceForDate, itemsForDate, isOverdue, monthDays, weekDays } from "./calendar";
+import { calendarBadgeCount, dateKey, itemOccurrenceForDate, itemsForDate, isOverdue, monthDays, weekDays } from "./calendar";
 import type { TodoItem } from "../types";
 
 const item = (overrides: Partial<TodoItem> = {}): TodoItem => ({
@@ -44,6 +44,30 @@ describe("calendar", () => {
     expect(itemsForDate([recurring], new Date(2026, 7, 25))).toHaveLength(0);
     expect(itemOccurrenceForDate(recurring, new Date(2026, 7, 19)).completed).toBe(true);
     expect(itemOccurrenceForDate(recurring, new Date(2026, 7, 24)).completed).toBe(false);
+  });
+  it("日历角标只统计未完成待办和未开始会议", () => {
+    const date = new Date(2026, 7, 18, 12);
+    const now = new Date(2026, 7, 18, 10);
+    const pendingTask = item({ id: "pending" });
+    const completedTask = item({ id: "completed", completed: true });
+    const completedOccurrence = item({
+      id: "recurring-completed",
+      taskSchedule: { mode: "weekly", startsOn: "2026-08-18", weekdays: [2] },
+      completedDates: ["2026-08-18"],
+    });
+    const upcomingMeeting = item({
+      id: "upcoming-meeting", type: "meeting", dueAt: null,
+      startAt: new Date(2026, 7, 18, 11).toISOString(), endAt: new Date(2026, 7, 18, 12).toISOString(),
+    });
+    const startedMeeting = item({
+      id: "started-meeting", type: "meeting", dueAt: null,
+      startAt: new Date(2026, 7, 18, 9).toISOString(), endAt: new Date(2026, 7, 18, 11).toISOString(),
+    });
+    const completedMeeting = item({
+      id: "completed-meeting", type: "meeting", completed: true, dueAt: null,
+      startAt: new Date(2026, 7, 18, 13).toISOString(), endAt: new Date(2026, 7, 18, 14).toISOString(),
+    });
+    expect(calendarBadgeCount([pendingTask, completedTask, completedOccurrence, upcomingMeeting, startedMeeting, completedMeeting], date, now)).toBe(2);
   });
   it("已完成任务不会标记逾期", () => {
     expect(isOverdue(item(), new Date("2026-08-20T12:00:00Z"))).toBe(true);
