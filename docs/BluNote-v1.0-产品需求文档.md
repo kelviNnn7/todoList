@@ -383,7 +383,7 @@ Acceptance Criteria:
 | I-030 | 发布治理 | 后续推送至 main 的功能需求变更都要更新需求文档，并记录更新时间和版本 | 将需求文档更新设为功能发布的强制前置条件 | 本文档、发布门禁 | 已生效 |
 | I-031 | v0.3.0 | 新增待办支持单日或每周一个/多个星期；设置支持字体大小；点击外部自动收起设置栏 | 增加每周任务规则与按日完成记录、三级字体持久化、设置栏外部点击检测 | FR-023、FR-026、FR-027 | dev 已实现，待发布验证与 main 批准 |
 | I-032 | v0.3.1 | 缩小每周重复筛选 UI；字体改为以当前标准字号起步的四档滑杆，拉开档位差异 | 每周筛选条收窄、星期按钮缩至 30px；字体档位调整为 100%/115%/130%/145% 并兼容旧偏好 | FR-023、FR-026 | dev 已实现，待发布验证与 main 批准 |
-| I-033 | v0.3.2 | 日历小数字仅显示未完成待办和未开始会议；同步交付 macOS 与 Windows 安装包并严格回归 | 统一角标业务口径；共享自动化在 macOS/Windows 分别执行；Windows 增加应用启动与 NSIS 完整性校验 | FR-005、FR-019、FR-020、FR-028 | dev 已实现，待双平台 CI 与真机安装验收 |
+| I-033 | v0.3.2 | 日历小数字仅显示未完成待办和未开始会议；同步交付 macOS 与 Windows 安装包并严格回归 | 统一角标业务口径；共享自动化在 macOS/Windows 分别执行；Windows 增加应用启动与 NSIS 完整性校验 | FR-005、FR-019、FR-020、FR-028 | dev 已实现，双平台 CI 已通过；待真机安装/视觉验收与 main 批准 |
 
 ### Document Revision History
 
@@ -468,8 +468,8 @@ v1.0 需要增加或标准化：
 
 | 平台 | 支持范围 | 安装格式 | 当前状态 | 发布要求 |
 |---|---|---|---|---|
-| macOS | Apple Silicon；Intel 策略待确认 | DMG | v0.3.2 arm64 构建中 | Developer ID 签名、公证、Gatekeeper、多机验证 |
-| Windows | Windows 10/11 x64 | NSIS EXE | v0.3.2 x64 构建中 | Authenticode 签名、升级/卸载与真机视觉验证 |
+| macOS | Apple Silicon；Intel 策略待确认 | DMG | v0.3.2 arm64 已通过 CI 构建与完整性校验 | Developer ID 签名、公证、Gatekeeper、多机验证 |
+| Windows | Windows 10/11 x64 | NSIS EXE | v0.3.2 x64 已通过 CI 构建、启动冒烟与安装包校验 | Authenticode 签名、升级/卸载与真机视觉验证 |
 | 银河麒麟 | V10 SP1 2503，Hygon C86/x86_64 | DEB | v0.2.4 自包含运行时 | 指定真机安装、启动、窗口、通知、持久化长稳测试 |
 
 ### Security & Privacy
