@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { format, getISODay } from "date-fns";
 import App from "./App";
 import { scopedStorageKey } from "./lib/scopedStorage";
@@ -8,6 +8,7 @@ import type { TodoItem } from "./types";
 
 describe("App", () => {
   beforeEach(() => localStorage.clear());
+  afterEach(() => vi.useRealTimers());
   it("挂件默认显示周视图和空状态", async () => {
     const { container } = render(<App/>);
     expect(await screen.findByText("这一天很清爽")).toBeInTheDocument();
@@ -22,6 +23,44 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "月" }));
     expect(container.querySelectorAll(".calendar-grid button").length).toBeGreaterThanOrEqual(35);
     expect(localStorage.getItem(scopedStorageKey("calendarView.widget"))).toBe("month");
+  });
+  it("跨过周日午夜后自动展示新一周和当天待办", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 7, 30, 23, 59, 50));
+    render(<App/>);
+    expect(screen.getByRole("button", { name: "8月24日 — 8月30日" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "8月30日待办列表" })).toBeInTheDocument();
+
+    act(() => vi.advanceTimersByTime(30_000));
+
+    expect(screen.getByRole("button", { name: "8月31日 — 9月6日" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "8月31日待办列表" })).toBeInTheDocument();
+  });
+  it("跨过月末午夜后自动展示新月份和当天待办", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 8, 30, 23, 59, 50));
+    localStorage.setItem(scopedStorageKey("calendarView.widget"), "month");
+    render(<App/>);
+    expect(screen.getByRole("button", { name: "2026年 9月" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "9月30日待办列表" })).toBeInTheDocument();
+
+    act(() => vi.advanceTimersByTime(30_000));
+
+    expect(screen.getByRole("button", { name: "2026年 10月" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "10月1日待办列表" })).toBeInTheDocument();
+  });
+  it("切换周月视图时回到系统当天和当前周期", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 8, 7, 10, 0));
+    const { container } = render(<App/>);
+    fireEvent.click(screen.getByRole("button", { name: "上一周" }));
+    fireEvent.click(container.querySelectorAll(".calendar-grid button")[0]);
+    expect(screen.queryByRole("region", { name: "9月7日待办列表" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "月" }));
+
+    expect(screen.getByRole("button", { name: "2026年 9月" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "9月7日待办列表" })).toBeInTheDocument();
   });
   it("可以打开新增会议表单并校验", async () => {
     const user = userEvent.setup(); render(<App/>);
