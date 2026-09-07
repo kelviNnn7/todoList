@@ -91,12 +91,34 @@ struct WidgetProvider: TimelineProvider {
 
 struct WidgetContentView: View {
     @Environment(\.widgetFamily) private var family
+    @Environment(\.colorScheme) private var colorScheme
     let entry: WidgetEntry
+
+    private var widgetSurface: some View {
+        ZStack {
+            (colorScheme == .dark ? Color.black.opacity(0.42) : Color.white.opacity(0.62))
+            RadialGradient(
+                colors: [Color.blue.opacity(colorScheme == .dark ? 0.22 : 0.16), Color.clear],
+                center: .topTrailing,
+                startRadius: 0,
+                endRadius: 180
+            )
+            LinearGradient(
+                colors: [Color.white.opacity(colorScheme == .dark ? 0.12 : 0.42), Color.clear],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Image(systemName: "checkmark.square.fill").foregroundStyle(.blue)
+                Image(systemName: "checkmark.square.fill")
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.blue)
+                    .frame(width: 22, height: 22)
+                    .background(Color.white.opacity(colorScheme == .dark ? 0.1 : 0.42), in: RoundedRectangle(cornerRadius: 7))
                 Text("BluNote · 今天").font(.system(size: 13, weight: .semibold))
                 Spacer()
                 Text(entry.date, style: .date).font(.caption2).foregroundStyle(.secondary)
@@ -106,7 +128,12 @@ struct WidgetContentView: View {
                     Image(systemName: "video.fill").foregroundStyle(.purple)
                     Text(meeting.title).lineLimit(1)
                     if let date = meeting.date { Spacer(); Text(date, style: .time).foregroundStyle(.secondary) }
-                }.font(.caption)
+                }
+                .font(.caption)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(Color.purple.opacity(colorScheme == .dark ? 0.15 : 0.09), in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(colorScheme == .dark ? 0.1 : 0.38), lineWidth: 0.5))
             }
             if entry.tasks.isEmpty && entry.meeting == nil {
                 Spacer()
@@ -130,9 +157,9 @@ struct WidgetContentView: View {
 
     @ViewBuilder var body: some View {
         if #available(macOSApplicationExtension 14.0, *) {
-            content.containerBackground(for: .widget) { Color.clear }
+            content.containerBackground(for: .widget) { widgetSurface }
         } else {
-            content.background(Color.clear)
+            content.background(widgetSurface)
         }
     }
 }
