@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calendarBadgeCount, dateKey, itemOccurrenceForDate, itemsForDate, isOverdue, monthDays, weekDays } from "./calendar";
+import { calendarBadge, dateKey, itemOccurrenceForDate, itemsForDate, isOverdue, monthDays, weekDays } from "./calendar";
 import type { TodoItem } from "../types";
 
 const item = (overrides: Partial<TodoItem> = {}): TodoItem => ({
@@ -67,7 +67,13 @@ describe("calendar", () => {
       id: "completed-meeting", type: "meeting", completed: true, dueAt: null,
       startAt: new Date(2026, 7, 18, 13).toISOString(), endAt: new Date(2026, 7, 18, 14).toISOString(),
     });
-    expect(calendarBadgeCount([pendingTask, completedTask, completedOccurrence, upcomingMeeting, startedMeeting, completedMeeting], date, now)).toBe(2);
+    expect(calendarBadge([pendingTask, completedTask, completedOccurrence, upcomingMeeting, startedMeeting, completedMeeting], date, now)).toEqual({ count: 2, overdue: false });
+  });
+  it("过去日期存在未完成待办时将日历角标标记为逾期", () => {
+    const date = new Date(2026, 7, 18, 12);
+    const now = new Date(2026, 7, 20, 10);
+    expect(calendarBadge([item()], date, now)).toEqual({ count: 1, overdue: true });
+    expect(calendarBadge([item({ completed: true })], date, now)).toEqual({ count: 0, overdue: false });
   });
   it("已完成任务不会标记逾期", () => {
     expect(isOverdue(item(), new Date("2026-08-20T12:00:00Z"))).toBe(true);

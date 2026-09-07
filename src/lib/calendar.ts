@@ -41,11 +41,19 @@ export function itemsForDate(items: TodoItem[], date: Date): TodoItem[] {
   return items.filter((item) => isItemScheduledForDate(item, date));
 }
 
-export function calendarBadgeCount(items: TodoItem[], date: Date, now = new Date()): number {
-  return itemsForDate(items, date).filter((item) => {
-    if (item.type === "task") return !itemOccurrenceForDate(item, date).completed;
-    return Boolean(!item.completed && item.startAt && parseISO(item.startAt).getTime() > now.getTime());
-  }).length;
+export function calendarBadge(items: TodoItem[], date: Date, now = new Date()): { count: number; overdue: boolean } {
+  const dateIsPast = isBefore(startOfDay(date), startOfDay(now));
+  return itemsForDate(items, date).reduce<{ count: number; overdue: boolean }>((badge, item) => {
+    if (item.type === "task") {
+      if (!itemOccurrenceForDate(item, date).completed) {
+        badge.count += 1;
+        badge.overdue ||= dateIsPast;
+      }
+      return badge;
+    }
+    if (!item.completed && item.startAt && parseISO(item.startAt).getTime() > now.getTime()) badge.count += 1;
+    return badge;
+  }, { count: 0, overdue: false });
 }
 
 export function isOverdue(item: TodoItem, now = new Date()): boolean {

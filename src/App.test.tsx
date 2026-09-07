@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { format, getISODay } from "date-fns";
+import { addDays, format, getISODay } from "date-fns";
 import App from "./App";
 import { scopedStorageKey } from "./lib/scopedStorage";
 import type { TodoItem } from "./types";
@@ -86,15 +86,31 @@ describe("App", () => {
     const { container } = render(<App/>);
     expect(container.querySelector("main")).toHaveAttribute("style", expect.stringContaining("--font-scale: 1"));
     await user.click(screen.getByRole("button", { name: "更多选项" }));
-    expect(screen.getByText("1 档 · 100%")).toBeInTheDocument();
+    expect(screen.queryByText("1 档 · 100%")).not.toBeInTheDocument();
     const slider = screen.getByRole("slider", { name: "字体大小" });
     expect(slider).toHaveAttribute("min", "1");
     expect(slider).toHaveAttribute("max", "4");
     expect(slider).toHaveAttribute("step", "1");
     fireEvent.change(slider, { target: { value: "4" } });
     expect(container.querySelector("main")).toHaveAttribute("style", expect.stringContaining("--font-scale: 1.45"));
-    expect(screen.getByText("4 档 · 145%")).toBeInTheDocument();
+    expect(slider).toHaveAttribute("aria-valuetext", "4 档，145%");
     expect(localStorage.getItem(scopedStorageKey("appearanceFontSize"))).toBe("4");
+  });
+  it("过去日期的未完成待办使用逾期日历角标", async () => {
+    const now = new Date();
+    const yesterday = addDays(now, -1);
+    const overdueTask: TodoItem = {
+      id: "overdue-task", type: "task", title: "逾期任务", notes: "", startAt: null, endAt: null,
+      dueAt: new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 23, 59, 59).toISOString(),
+      location: "", meetingUrl: "", reminderMinutes: null, reminderSentAt: null, reminderAt: null,
+      reminderStatus: "none", snoozeCount: 0, lastReminderAt: null, completed: false, source: "local", subtasks: [],
+      createdAt: now.toISOString(), updatedAt: now.toISOString(),
+    };
+    localStorage.setItem(scopedStorageKey("calendarView.widget"), "month");
+    localStorage.setItem(scopedStorageKey("items.v1"), JSON.stringify([overdueTask]));
+    const { container } = render(<App/>);
+
+    await waitFor(() => expect(container.querySelector(".calendar-grid i.overdue")).toHaveTextContent("1"));
   });
   it("点击设置栏外部时自动收起设置栏", async () => {
     const user = userEvent.setup(); render(<App/>);
