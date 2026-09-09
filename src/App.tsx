@@ -9,7 +9,7 @@ import { parseIcs } from "./lib/ics";
 import { isTaskReminderDue, markReminderFired, quickSnoozeAt, snoozeTask, type QuickSnooze } from "./lib/reminders";
 import { deleteItem, loadItems, saveItem } from "./lib/storage";
 import { readScopedValue, writeScopedValue } from "./lib/scopedStorage";
-import { endResizeDragging, invoke, isAutostartEnabled, isDesktopRuntime, isElectronRuntime, listen, sendMeetingNotification, setAutostartEnabled, startDragging, startResizeDragging, updateResizeDragging } from "./lib/desktop";
+import { invoke, isAutostartEnabled, isDesktopRuntime, listen, sendMeetingNotification, setAutostartEnabled, startDragging, startResizeDragging } from "./lib/desktop";
 import type { CalendarViewMode, FilterType, ItemType, TodoItem } from "./types";
 import appIcon from "./assets/app-icon.png";
 
@@ -234,19 +234,7 @@ export default function App() {
   function startWindowResize(direction: ResizeDirection, event: React.PointerEvent) {
     event.preventDefault(); event.stopPropagation();
     if (!isDesktopRuntime()) return;
-    if (!isElectronRuntime()) { void startResizeDragging(direction); return; }
-    const point = { x: event.screenX, y: event.screenY };
-    void startResizeDragging(direction, point);
-    const move = (moveEvent: PointerEvent) => void updateResizeDragging({ x: moveEvent.screenX, y: moveEvent.screenY });
-    const finish = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", finish);
-      window.removeEventListener("blur", finish);
-      void endResizeDragging();
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", finish);
-    window.addEventListener("blur", finish);
+    void startResizeDragging(direction);
   }
   function startWindowDrag(event: React.MouseEvent) {
     if (locked || event.button !== 0 || (event.target as HTMLElement).closest("button,input,select,textarea,a,label,.app-menu,[role=separator]")) return;
@@ -255,7 +243,7 @@ export default function App() {
     if (!isDesktopRuntime()) return;
     void startDragging().catch(() => setNotice("窗口拖动启动失败，请重试"));
   }
-  return <main className={`app-shell ${isElectronRuntime() ? "runtime-electron" : ""} ${expandedWindow ? "expanded" : ""} ${desktopWidget ? "desktop-widget" : ""} ${locked ? "position-locked" : ""} ${dragging ? "dragging" : ""}`} style={{ "--widget-opacity": appearanceOpacity / 100, "--font-scale": fontScale[appearanceFontLevel] } as React.CSSProperties}>
+  return <main className={`app-shell ${expandedWindow ? "expanded" : ""} ${desktopWidget ? "desktop-widget" : ""} ${locked ? "position-locked" : ""} ${dragging ? "dragging" : ""}`} style={{ "--widget-opacity": appearanceOpacity / 100, "--font-scale": fontScale[appearanceFontLevel] } as React.CSSProperties}>
     {resizeDirections.map((direction) => <div key={direction} className={`window-resize-handle resize-${direction.toLowerCase()}`} aria-hidden="true" onPointerDown={(event) => startWindowResize(direction, event)}/>)}
     <div className="drag-region" onMouseDown={startWindowDrag}/>
     <header className="topbar" onMouseDown={startWindowDrag}>

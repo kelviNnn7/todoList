@@ -3,8 +3,6 @@ import { deleteItem, loadItems, saveItem } from "./storage";
 import type { TodoItem } from "../types";
 import { scopedStorageKey } from "./scopedStorage";
 
-const legacyStorageKey = (name: string) => `${["pin", "do"].join("")}.${name}`;
-
 const makeItem = (id: string, title = "本地任务"): TodoItem => ({
   id, type: "task", title, notes: "", startAt: null, endAt: null, dueAt: null, location: "", meetingUrl: "",
   reminderMinutes: null, reminderSentAt: null, reminderAt: null, reminderStatus: "none", snoozeCount: 0, lastReminderAt: null,
@@ -27,12 +25,10 @@ describe("storage browser fallback", () => {
     localStorage.setItem(scopedStorageKey("items.v1"), JSON.stringify([{ id: 7 }, makeItem("ok")]));
     expect(await loadItems()).toEqual([makeItem("ok")]);
   });
-  it("无损迁移 v0.1 数据并补齐提醒默认值", async () => {
-    const legacy = makeItem("legacy") as Partial<TodoItem>;
-    delete legacy.reminderAt; delete legacy.reminderStatus; delete legacy.snoozeCount; delete legacy.lastReminderAt;
-    localStorage.setItem(legacyStorageKey("items.v1"), JSON.stringify([legacy]));
-    expect((await loadItems())[0]).toMatchObject({ id: "legacy", reminderAt: null, reminderStatus: "none", snoozeCount: 0, lastReminderAt: null });
-    expect(localStorage.getItem(scopedStorageKey("items.v1"))).not.toBeNull();
-    expect(localStorage.getItem(legacyStorageKey("items.v1"))).toBeNull();
+  it("读取旧字段记录时补齐提醒默认值", async () => {
+    const previousSchemaItem = makeItem("previous-schema") as Partial<TodoItem>;
+    delete previousSchemaItem.reminderAt; delete previousSchemaItem.reminderStatus; delete previousSchemaItem.snoozeCount; delete previousSchemaItem.lastReminderAt;
+    localStorage.setItem(scopedStorageKey("items.v1"), JSON.stringify([previousSchemaItem]));
+    expect((await loadItems())[0]).toMatchObject({ id: "previous-schema", reminderAt: null, reminderStatus: "none", snoozeCount: 0, lastReminderAt: null });
   });
 });

@@ -1,18 +1,16 @@
 # BluNote
 
-BluNote 是一款面向 macOS、Windows 与银河麒麟的轻量桌面待办挂件，用紧凑的日历、任务和会议视图帮助用户管理当天安排。macOS/Windows 采用 Tauri 2，银河麒麟采用自包含 Electron 运行时，界面统一使用 React 19，数据与设置默认只保存在本机。
+BluNote 是一款面向 macOS 的轻量桌面待办挂件，用紧凑的日历、任务和会议视图帮助用户管理当天安排。应用采用 Tauri 2、React 19 与本地 SQLite，数据与设置默认只保存在本机。
 
-当前版本：`dev` 为 `0.3.5`，`main` 稳定版为 `0.3.4`
+当前版本：`dev` 为 `0.3.6`，`main` 稳定版为 `0.3.4`
 
 ## 支持平台
 
 | 平台 | 最低要求 | 当前构建说明 |
 |---|---|---|
 | macOS | macOS 13 | 本地 DMG 按构建机器架构生成；当前提供的安装包为 Apple Silicon `arm64` |
-| Windows | Windows 10 21H2 | 使用 NSIS 生成安装程序，WebView2 采用下载引导安装模式 |
-| 银河麒麟 | V10 SP1 2503，x86_64/Hygon C86 | 使用自包含 Electron 的 DEB，不依赖 `libwebkit2gtk-4.1-0`；v0.3.2 已精简冗余前端依赖和语言包 |
 
-面向外部用户正式分发前，macOS 安装包需要 Developer ID 签名与 Apple 公证，Windows 安装包需要 Authenticode 签名。Intel 与 Apple Silicon 通用的 macOS 安装包还需要额外构建 Universal 2 产物。
+面向外部用户正式分发前，macOS 安装包需要 Developer ID 签名与 Apple 公证。Intel 与 Apple Silicon 通用的安装包还需要额外构建 Universal 2 产物。
 
 ## 已实现功能
 
@@ -77,12 +75,12 @@ todoList/
 │   └── assets/             # 应用内图标
 ├── src-tauri/              # Tauri/Rust 桌面端
 │   ├── capabilities/       # 最小权限配置
-│   ├── icons/              # macOS 与 Windows 打包图标
+│   ├── icons/              # macOS 打包图标
 │   └── src/                # SQLite、窗口、通知和托盘实现
 ├── native/                 # macOS WidgetKit 与刷新桥接程序
 ├── scripts/                # macOS DMG 构建脚本
 ├── docs/                   # 功能文档、需求文档与发布检查
-└── .github/workflows/      # 质量检查和跨平台构建
+└── .github/workflows/      # 质量检查和 macOS 构建
 ```
 
 ## 本地开发
@@ -119,7 +117,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-`npm run check` 会依次执行 ESLint、Vitest 和生产构建。GitHub Actions 还会运行依赖审计，并在 macOS、Windows 环境构建原生安装包。
+`npm run check` 会依次执行 ESLint、Vitest 和生产构建。GitHub Actions 还会运行依赖审计并构建 macOS 安装包。
 
 常用命令：
 
@@ -144,10 +142,7 @@ npm run check
 npm run tauri build
 ```
 
-默认产物位置：
-
-- macOS：`src-tauri/target/release/bundle/dmg/`
-- Windows：`src-tauri/target/release/bundle/nsis/`
+默认产物位于 `src-tauri/target/release/bundle/dmg/`。
 
 ### 包含 WidgetKit 的 macOS DMG
 
@@ -187,12 +182,12 @@ bash scripts/build-macos-dmg.sh
 - 当前不支持账号体系或跨设备同步。
 - 当前不支持 Apple EventKit、Microsoft Outlook 账户直连，仅支持 ICS 文件导入。
 - macOS WidgetKit 需要完整 Xcode、App Group 和正式 Apple Team 签名。
-- 正式公开分发仍需完成 macOS Developer ID/公证与 Windows Authenticode 签名。
+- 正式公开分发仍需完成 macOS Developer ID 签名与 Apple 公证。
 - 当前本地 macOS 安装包为 Apple Silicon `arm64`，Intel Mac 需要单独的 x86_64 或 Universal 2 构建。
 
 ## 相关文档
 
-- [BluNote v0.2.2 功能说明书](docs/BluNote-v0.2.2-功能说明书.md)
+- [BluNote v0.2.2 历史功能说明书](docs/BluNote-v0.2.2-功能说明书.md)
 - [BluNote v1.0 产品需求文档](docs/BluNote-v1.0-产品需求文档.md)
 - [上线前检查清单](docs/RELEASE_CHECKLIST.md)
 
