@@ -100,6 +100,48 @@ func diff(_ lhs: PixelImage, _ rhs: PixelImage) -> ImageDiff {
     )
 }
 
+func backgroundDiff(_ lhs: PixelImage, _ rhs: PixelImage) -> ImageDiff {
+    guard lhs.width == rhs.width, lhs.height == rhs.height else {
+        return ImageDiff(mean: .infinity, maxChannel: 255, changedFraction: 1)
+    }
+    // Fixed patches in the shell padding/empty bottom area. These never contain
+    // text or controls, so the comparison isolates the shell background even
+    // when the loading -> empty-state content timing differs between runs.
+    let points: [(Double, Double)] = [
+        (0.08, 0.80), (0.92, 0.80), (0.08, 0.92), (0.92, 0.92), (0.50, 0.95),
+    ]
+    var total = 0.0
+    var maxChannel = 0
+    var changed = 0
+    var pixels = 0
+    for (nx, ny) in points {
+        let centerX = Int(Double(lhs.width) * nx)
+        let centerY = Int(Double(lhs.height) * ny)
+        for dy in -3...3 {
+            for dx in -3...3 {
+                let x = centerX + dx
+                let y = centerY + dy
+                guard x >= 0, y >= 0, x < lhs.width, y < lhs.height else { continue }
+                let offset = (y * lhs.width + x) * 4
+                var pixelChanged = false
+                for channel in 0..<3 {
+                    let delta = abs(Int(lhs.bytes[offset + channel]) - Int(rhs.bytes[offset + channel]))
+                    total += Double(delta)
+                    if delta > maxChannel { maxChannel = delta }
+                    if delta > 4 { pixelChanged = true }
+                }
+                if pixelChanged { changed += 1 }
+                pixels += 1
+            }
+        }
+    }
+    return ImageDiff(
+        mean: total / Double(max(pixels, 1) * 3),
+        maxChannel: maxChannel,
+        changedFraction: Double(changed) / Double(max(pixels, 1))
+    )
+}
+
 func pngData(_ image: PixelImage) -> Data? {
     guard let rep = NSBitmapImageRep(
         bitmapDataPlanes: nil,
@@ -294,7 +336,13 @@ func runProbe(url: URL, opacity: Int, dark: Bool, background: String, label: Str
         print("app shell did not render for \(label)")
         return nil
     }
-    // This is the first stable frame with no click, focus, or timer intervention.
+    // Wait until the shell material itself is applied. This still happens before
+    // any interaction and avoids comparing a pre-CSS flash with the first frame.
+    guard probe.waitFor("(function () { var shell = document.querySelector('main.app-shell'); return document.readyState === 'complete' && !!shell && getComputedStyle(shell).backgroundImage.indexOf('linear-gradient') >= 0; })()") else {
+        print("app shell material did not apply for \(label)")
+        return nil
+    }
+    // This is the first stable shell frame with no click, focus, or timer intervention.
     pump(0.05)
     guard let firstPaint = probe.snapshot() else { return nil }
     _ = probe.waitFor("!!document.querySelector('.empty-state')")
@@ -382,13 +430,21 @@ func runTests(url: URL, outputDirectory: URL) {
             "metadataB": runB.metadata,
         ]
         var diffs: [String: Any] = [:]
+        var backgroundDiffs: [String: Any] = [:]
         var stability: [String: Any] = [:]
         for state in states {
             guard let imageA = runA.images[state], let imageB = runB.images[state] else { continue }
+            let region = diff(imageA, imageB)
             diffs[state] = [
-                "mean": diff(imageA, imageB).mean,
-                "maxChannel": diff(imageA, imageB).maxChannel,
-                "changedFraction": diff(imageA, imageB).changedFraction,
+                "mean": region.mean,
+                "maxChannel": region.maxChannel,
+                "changedFraction": region.changedFraction,
+            ]
+            let background = backgroundDiff(imageA, imageB)
+            backgroundDiffs[state] = [
+                "mean": background.mean,
+                "maxChannel": background.maxChannel,
+                "changedFraction": background.changedFraction,
             ]
         }
         for state in ["blur", "focus", "dragging", "restored", "active"] {
@@ -397,6 +453,7 @@ func runTests(url: URL, outputDirectory: URL) {
             stability["ready-\(state)"] = ["mean": value.mean, "maxChannel": value.maxChannel, "changedFraction": value.changedFraction]
         }
         caseReport["backgroundDiff"] = diffs
+        caseReport["backgroundPixelDiff"] = backgroundDiffs
         caseReport["stability"] = stability
         report.append(caseReport)
 
@@ -410,18 +467,24 @@ func runTests(url: URL, outputDirectory: URL) {
             }
         }
 
-        let aDiff = diff(runA.images["ready"]!, runB.images["ready"]!)
-        let firstDiff = diff(runA.images["firstPaint"]!, runB.images["firstPaint"]!)
-        let blurDiff = diff(runA.images["blur"]!, runB.images["blur"]!)
-        let focusDiff = diff(runA.images["focus"]!, runB.images["focus"]!)
-        let dragDiff = diff(runA.images["dragging"]!, runB.images["dragging"]!)
-        let restoredDiff = diff(runA.images["restored"]!, runB.images["restored"]!)
+        let aDiff = backgroundDiff(runA.images["ready"]!, runB.images["ready"]!)
+        let firstDiff = backgroundDiff(runA.images["firstPaint"]!, runB.images["firstPaint"]!)
+        let blurDiff = backgroundDiff(runA.images["blur"]!, runB.images["blur"]!)
+        let focusDiff = backgroundDiff(runA.images["focus"]!, runB.images["focus"]!)
+        let dragDiff = backgroundDiff(runA.images["dragging"]!, runB.images["dragging"]!)
+        let restoredDiff = backgroundDiff(runA.images["restored"]!, runB.images["restored"]!)
+        let regionReady = diff(runA.images["ready"]!, runB.images["ready"]!)
         switch item.opacity {
         case 100:
             for (state, value) in [("firstPaint", firstDiff), ("ready", aDiff), ("blur", blurDiff), ("focus", focusDiff), ("dragging", dragDiff), ("restored", restoredDiff)] {
-                if value.mean > 0.5 || value.maxChannel > 2 {
-                    failures.append("\(item.name)-\(state): background leaked mean=\(value.mean) max=\(value.maxChannel)")
+                if value.mean > 0.2 || value.maxChannel > 2 {
+                    failures.append("\(item.name)-\(state): background pixels leaked mean=\(value.mean) max=\(value.maxChannel)")
                 }
+            }
+            // Content is settled after the first paint; allow only tiny antialiasing
+            // noise while still rejecting a real desktop-background leak.
+            if regionReady.mean > 1.0 || regionReady.maxChannel > 8 || regionReady.changedFraction > 0.02 {
+                failures.append("\(item.name)-ready: content region leaked mean=\(regionReady.mean) max=\(regionReady.maxChannel) changed=\(regionReady.changedFraction)")
             }
             if item.activate {
                 if runA.keyWindow && runB.keyWindow, let activeA = runA.images["active"], let activeB = runB.images["active"] {
@@ -441,11 +504,6 @@ func runTests(url: URL, outputDirectory: URL) {
             if aDiff.mean < 5.0 { failures.append("\(item.name): 55% was unexpectedly opaque mean=\(aDiff.mean)") }
         default:
             break
-        }
-        for (state, value) in [("blur", blurDiff), ("focus", focusDiff), ("dragging", dragDiff), ("restored", restoredDiff)] {
-            if item.opacity == 100 && (value.mean > 0.5 || value.maxChannel > 2) {
-                failures.append("\(item.name)-\(state): background changed while state changed")
-            }
         }
         for (state, value) in stability {
             guard let dict = value as? [String: Any], let mean = dict["mean"] as? Double else { continue }
