@@ -1,8 +1,8 @@
 [package]
 name = "desktop-todo"
 version = "0.3.6"
-description = "轻量跨平台桌面待办挂件"
-authors = ["BluNote contributors"]
+description = "轻量 macOS 桌面待办挂件"
+authors = ["Desktop Todo contributors"]
 edition = "2021"
 
 [lib]

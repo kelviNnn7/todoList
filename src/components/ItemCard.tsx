@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Bell, BellRing, ChevronDown, ChevronRight, Clock3, MapPin, Pencil, Repeat2, Trash2, Video } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import type { TodoItem } from "../types";
@@ -8,9 +8,13 @@ import { canSnooze, quickSnoozeAt, snoozesToday, snoozeTask, type QuickSnooze } 
 interface Props { item: TodoItem; autoExpand?: boolean; onChange: (item: TodoItem) => Promise<void>; onDelete: (id: string) => Promise<void>; onEdit: (item: TodoItem) => void }
 
 export function ItemCard({ item, autoExpand = false, onChange, onDelete, onEdit }: Props) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(autoExpand);
+  const [lastAutoExpand, setLastAutoExpand] = useState(autoExpand);
   const [customReminder, setCustomReminder] = useState("");
-  useEffect(() => { if (autoExpand) setExpanded(true); }, [autoExpand]);
+  if (autoExpand !== lastAutoExpand) {
+    setLastAutoExpand(autoExpand);
+    if (autoExpand) setExpanded(true);
+  }
   const done = item.subtasks.filter((subtask) => subtask.completed).length;
   const progress = item.subtasks.length ? Math.round(done / item.subtasks.length * 100) : item.completed ? 100 : 0;
   const overdue = isOverdue(item);

@@ -2,7 +2,7 @@
 
 BluNote 是一款面向 macOS 的轻量桌面待办挂件，用紧凑的日历、任务和会议视图帮助用户管理当天安排。应用采用 Tauri 2、React 19 与本地 SQLite，数据与设置默认只保存在本机。
 
-当前版本：`dev` 为 `0.3.6`，`main` 稳定版为 `0.3.4`
+当前版本：`main` 与 `dev` 均为 `0.3.6`
 
 ## 支持平台
 
@@ -87,7 +87,7 @@ todoList/
 
 ### 环境要求
 
-- Node.js `20.19+` 或 `22.12+`
+- Node.js `22.13+` 或 `24+`（推荐 22 LTS）
 - npm
 - Rust stable
 - 对应平台的 [Tauri 2 系统依赖](https://v2.tauri.app/start/prerequisites/)
@@ -117,7 +117,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-`npm run check` 会依次执行 ESLint、Vitest 和生产构建。GitHub Actions 还会运行依赖审计并构建 macOS 安装包。
+`npm run check` 会依次执行 ESLint、Vitest 和生产构建。提交前还应运行 `npm audit --audit-level=moderate`；GitHub Actions 会运行依赖审计并构建 macOS 安装包。
 
 常用命令：
 
@@ -182,6 +182,7 @@ bash scripts/build-macos-dmg.sh
 - 当前不支持账号体系或跨设备同步。
 - 当前不支持 Apple EventKit、Microsoft Outlook 账户直连，仅支持 ICS 文件导入。
 - macOS WidgetKit 需要完整 Xcode、App Group 和正式 Apple Team 签名。
+- 仅安装 Xcode Command Line Tools 时，`npm run tauri build` 只能生成主应用 DMG；包含 WidgetKit 扩展的 DMG 必须使用完整 Xcode。
 - 正式公开分发仍需完成 macOS Developer ID 签名与 Apple 公证。
 - 当前本地 macOS 安装包为 Apple Silicon `arm64`，Intel Mac 需要单独的 x86_64 或 Universal 2 构建。
 

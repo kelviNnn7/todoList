@@ -26,6 +26,12 @@ describe("ItemCard", () => {
     await user.click(screen.getByRole("checkbox", { name: /完成测试/ }));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ completed: true }));
   });
+  it("聚焦事项后自动展开详情", () => {
+    const { rerender } = render(<ItemCard item={task} onChange={vi.fn()} onDelete={vi.fn()} onEdit={vi.fn()}/>);
+    expect(screen.queryByRole("button", { name: `编辑任务：${task.title}` })).not.toBeInTheDocument();
+    rerender(<ItemCard item={task} autoExpand onChange={vi.fn()} onDelete={vi.fn()} onEdit={vi.fn()}/>);
+    expect(screen.getByRole("button", { name: `编辑任务：${task.title}` })).toBeInTheDocument();
+  });
   it("展开后可以继续编辑事项", async () => {
     const onEdit = vi.fn(); const user = userEvent.setup();
     render(<ItemCard item={task} onChange={vi.fn()} onDelete={vi.fn()} onEdit={onEdit}/>);

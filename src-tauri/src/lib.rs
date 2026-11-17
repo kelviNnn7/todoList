@@ -480,7 +480,7 @@ pub fn run() {
             _ => {}
         })
         .run(tauri::generate_context!())
-        .expect("failed to run BluNote");
+        .expect("failed to run desktop todo");
 }
 
 #[cfg(test)]

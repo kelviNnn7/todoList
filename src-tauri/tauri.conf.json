@@ -39,7 +39,7 @@
     "category": "Productivity",
     "shortDescription": "轻量桌面任务与会议挂件",
     "longDescription": "BluNote 将任务、子任务与会议提醒常驻桌面，并提供周月日历和原生桌面小组件。",
-    "copyright": "Copyright © 2026 BluNote contributors",
+    "copyright": "Copyright © 2026 Desktop Todo contributors",
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns"],
     "macOS": { "minimumSystemVersion": "13.0", "entitlements": "entitlements.plist", "infoPlist": "Info.plist" }
   }
