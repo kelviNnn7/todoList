@@ -2,13 +2,13 @@
 
 BluNote 是一款面向 macOS 的轻量桌面待办挂件，用紧凑的日历、任务和会议视图帮助用户管理当天安排。应用采用 Tauri 2、React 19 与本地 SQLite，数据与设置默认只保存在本机。
 
-当前版本：`main` 为 `0.3.6`，`dev` 为 `0.3.7`
+当前版本：`main` 为 `0.3.6`，`dev` 为 `0.3.8`
 
 ## 支持平台
 
 | 平台 | 最低要求 | 当前构建说明 |
 |---|---|---|
-| macOS | macOS 13 | 本地 DMG 按构建机器架构生成；`main` 稳定包为 Apple Silicon `arm64` 0.3.6，`dev` 迭代包为 0.3.7 |
+| macOS | macOS 13 | 本地 DMG 按构建机器架构生成；`main` 稳定包为 Apple Silicon `arm64` 0.3.6，`dev` 迭代包为 0.3.8 |
 
 面向外部用户正式分发前，macOS 安装包需要 Developer ID 签名与 Apple 公证。Intel 与 Apple Silicon 通用的安装包还需要额外构建 Universal 2 产物。
 
@@ -122,7 +122,9 @@ cargo audit --file src-tauri/Cargo.lock
 
 `npm run check` 会依次执行 ESLint、带覆盖率的 Vitest 和生产构建。覆盖率门禁固定为 `src/lib/**/*.ts` 核心逻辑 statements 与 lines 均不低于 90%；覆盖范围包含全部核心模块，不使用 ignore 或排除低覆盖文件。当前全项目覆盖率不作为 90% 门禁，实际数值以 `coverage/coverage-summary.json` 为准。
 
-`npm run verify:version` 校验 `package.json`、`src-tauri/tauri.conf.json` 与 `src-tauri/Cargo.toml` 的版本完整性，主版本不一致或完整版本漂移都会直接失败。提交前还应运行 `npm audit --audit-level=moderate` 与 `cargo audit --file src-tauri/Cargo.lock`（首次使用需 `cargo install cargo-audit --locked`）；GitHub Actions 会运行依赖审计、覆盖率门禁并构建 macOS 安装包。
+`npm run verify:version` 校验 `package.json`、`src-tauri/tauri.conf.json` 与 `src-tauri/Cargo.toml` 的版本完整性，主版本不一致或完整版本漂移都会直接失败。提交前还应运行 `npm audit --audit-level=moderate` 与 `cargo audit --file src-tauri/Cargo.lock`（首次使用需 `cargo install cargo-audit --locked`）；GitHub Actions 会运行依赖审计、覆盖率门禁、WKWebView 透明度像素回归并构建 macOS 安装包。
+
+`npm run test:webkit` 使用真实 macOS WKWebView、非持久化数据目录和本地生产构建，在两个强对比页面背景上截图比较外壳内部像素：100% 必须完全遮挡背景，55/75/95 必须按档位可透，并覆盖首次绘制、blur/focus 与 dragging 状态。该命令只在 macOS 上运行，产物写入 `output/opacity-fix/`。测试不点击、不聚焦、不依赖定时重绘；若当前前台应用限制测试进程取得系统 key window，JSON 会记录 `keyWindow=false`，不会把模拟激活冒充为真机激活。
 
 常用命令：
 
@@ -131,6 +133,7 @@ cargo audit --file src-tauri/Cargo.lock
 | `npm run dev` | 启动 Vite 开发服务器 |
 | `npm run test` | 执行前端测试 |
 | `npm run test:coverage` | 生成核心逻辑覆盖率报告并执行 90% 阈值 |
+| `npm run test:webkit` | 运行 WKWebView 透明度像素回归（仅 macOS） |
 | `npm run verify:version` | 校验 package/Tauri/Cargo 版本一致性 |
 | `npm run lint` | 执行 ESLint |
 | `npm run build` | 执行 TypeScript 与 Vite 生产构建 |

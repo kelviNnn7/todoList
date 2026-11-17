@@ -43,6 +43,8 @@ jobs:
         run: npm run verify:version
       - name: Lint, coverage, and build
         run: npm run check
+      - name: WKWebView opacity pixel regression
+        run: npm run test:webkit
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
       - run: brew install xcodegen

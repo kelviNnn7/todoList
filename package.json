@@ -1,7 +1,7 @@
 {
   "name": "desktop-todo-widget",
   "private": true,
-  "version": "0.3.7",
+  "version": "0.3.8",
   "description": "macOS 桌面待办与会议挂件",
   "desktopName": "com.todo.desktop",
   "license": "MIT",
@@ -22,7 +22,8 @@
     "lint": "eslint . --max-warnings=0",
     "check": "npm run lint && npm run test:coverage && npm run build",
     "verify:version": "node scripts/verify-app-version.mjs",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test:webkit": "bash scripts/test-wkwebview-opacity.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.8.0",

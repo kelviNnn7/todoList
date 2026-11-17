@@ -9,6 +9,7 @@ import { parseIcs } from "./lib/ics";
 import { isTaskReminderDue, markReminderFired, quickSnoozeAt, snoozeTask, type QuickSnooze } from "./lib/reminders";
 import { deleteItem, loadItems, saveItem } from "./lib/storage";
 import { readScopedValue, writeScopedValue } from "./lib/scopedStorage";
+import { MAX_WIDGET_OPACITY, MIN_WIDGET_OPACITY, normalizeWidgetOpacity, readStoredWidgetOpacity } from "./lib/appearance";
 import { invoke, isAutostartEnabled, isDesktopRuntime, listen, sendMeetingNotification, setAutostartEnabled, startDragging, startResizeDragging } from "./lib/desktop";
 import type { CalendarViewMode, FilterType, ItemType, TodoItem } from "./types";
 import appIcon from "./assets/app-icon.png";
@@ -16,10 +17,6 @@ import appIcon from "./assets/app-icon.png";
 type ResizeDirection = "East" | "North" | "NorthEast" | "NorthWest" | "South" | "SouthEast" | "SouthWest" | "West";
 type FontLevel = 1 | 2 | 3 | 4;
 
-const savedOpacity = () => {
-  const value = Number(readScopedValue("appearanceOpacity"));
-  return Number.isFinite(value) && value >= 55 && value <= 100 ? Math.round(value / 5) * 5 : 95;
-};
 const savedView = (expanded: boolean): CalendarViewMode => {
   const value = readScopedValue(`calendarView.${expanded ? "expanded" : "widget"}`);
   return value === "week" || value === "month" ? value : expanded ? "month" : "week";
@@ -49,7 +46,7 @@ export default function App() {
   const [dragging, setDragging] = useState(false);
   const [autostart, setAutostart] = useState(false);
   const [desktopWidget, setDesktopWidget] = useState(() => readScopedValue("desktopWidget") === "true");
-  const [appearanceOpacity, setAppearanceOpacity] = useState(savedOpacity);
+  const [appearanceOpacity, setAppearanceOpacity] = useState(readStoredWidgetOpacity);
   const [appearanceFontLevel, setAppearanceFontLevel] = useState<FontLevel>(savedFontLevel);
   const [menuOpen, setMenuOpen] = useState(false);
   const [notice, setNotice] = useState("");
@@ -242,7 +239,7 @@ export default function App() {
     if (next && expandedWindow) { setExpandedWindow(false); setViewMode(savedView(false)); showToday(); if (isDesktopRuntime()) await invoke("set_window_mode", { expanded: false }); }
     setNotice(next ? "已切换为桌面小组件" : "已恢复普通窗口模式"); window.setTimeout(() => setNotice(""), 2200);
   }
-  function updateAppearanceOpacity(value: number) { const next = Math.min(100, Math.max(55, value)); setAppearanceOpacity(next); writeScopedValue("appearanceOpacity", String(next)); }
+  function updateAppearanceOpacity(value: number) { const next = normalizeWidgetOpacity(Math.min(MAX_WIDGET_OPACITY, Math.max(MIN_WIDGET_OPACITY, value))); setAppearanceOpacity(next); writeScopedValue("appearanceOpacity", String(next)); }
   function updateAppearanceFontLevel(value: number) { const next = Math.min(4, Math.max(1, Math.round(value))) as FontLevel; setAppearanceFontLevel(next); writeScopedValue("appearanceFontSize", String(next)); }
   async function importIcsFile(file: File | undefined) {
     if (!file) return;

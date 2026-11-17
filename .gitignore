@@ -13,3 +13,4 @@ src-tauri/gen/schemas
 *.db-wal
 .env
 HANDOFF.md
+.cache

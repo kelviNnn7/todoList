@@ -17,7 +17,10 @@
   --text-muted: #8a8a91;
   --separator: rgba(60, 60, 67, .105);
   --separator-strong: rgba(60, 60, 67, .16);
-  --surface: rgba(240, 245, 252, .68);
+  --shell-top: 251 253 255;
+  --shell-bottom: 237 243 251;
+  --shell-border-rgb: 255 255 255;
+  --shell-border-alpha: .74;
   --material: rgba(255, 255, 255, .5);
   --material-solid: rgba(250, 252, 255, .9);
   --control: rgba(118, 118, 128, .085);
@@ -55,56 +58,32 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   outline-offset: 2px;
 }
 
-/* 用户透明度只作用于玻璃背景层，文字与控件保持不透明，避免 55% 档位下可读性下降。 */
+/*
+ * 用户透明度只作用于外壳背景；文字与控件始终保持不透明。
+ *
+ * 背景必须由主元素自己绘制，不能放在负 z-index 伪元素里：WKWebView 首帧
+ * 对负层和 backdrop-filter 的合成时机不稳定。这里把不透明材质渐变直接
+ * 乘单一 --widget-opacity，100% 时首帧即为真正不透明，低档位保持确定的背景 alpha。
+ */
 .app-shell {
   position: relative;
-  isolation: isolate;
   height: 100vh;
   min-height: 500px;
   padding: 20px 16px 16px;
   overflow: hidden;
   border: 1px solid var(--glass-outline);
-  border-color: color-mix(in srgb, var(--glass-outline) calc(var(--widget-opacity) * 100%), transparent);
+  border-color: rgb(var(--shell-border-rgb) / calc(var(--widget-opacity, 1) * var(--shell-border-alpha)));
   border-radius: 24px;
-  background: transparent;
-  display: grid;
-  grid-template-rows: auto auto auto 1fr;
-  transition: border-color .18s ease, border-radius .28s var(--spring);
-}
-.app-shell::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  pointer-events: none;
-  border-radius: inherit;
-  background:
-    radial-gradient(100% 66% at 92% -12%, rgba(82, 166, 255, .28), transparent 60%),
-    radial-gradient(72% 58% at -8% 106%, rgba(177, 219, 255, .2), transparent 64%),
-    linear-gradient(145deg, rgba(255, 255, 255, .78), var(--surface));
+  background-color: transparent;
+  background-image: linear-gradient(145deg, rgb(var(--shell-top) / var(--widget-opacity, 1)), rgb(var(--shell-bottom) / var(--widget-opacity, 1)));
   box-shadow:
     0 26px 68px var(--shadow),
     0 5px 16px rgba(35, 57, 88, .08),
     inset 0 1px var(--glass-highlight),
     inset 0 0 0 .5px rgba(69, 101, 143, .07);
-  backdrop-filter: saturate(185%) contrast(104%) blur(40px);
-  -webkit-backdrop-filter: saturate(185%) contrast(104%) blur(40px);
-  opacity: var(--widget-opacity);
-  transition: opacity .18s ease;
-}
-.app-shell::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  pointer-events: none;
-  border-radius: inherit;
-  background:
-    linear-gradient(116deg, rgba(255,255,255,.52), transparent 24%, transparent 70%, rgba(255,255,255,.16)),
-    radial-gradient(58% 8% at 50% 0, rgba(255,255,255,.7), transparent 72%);
-  box-shadow: inset 0 -1px rgba(69,101,143,.08), inset 1px 0 rgba(255,255,255,.3), inset -1px 0 rgba(255,255,255,.18);
-  opacity: var(--widget-opacity);
-  transition: opacity .18s ease;
+  display: grid;
+  grid-template-rows: auto auto auto 1fr;
+  transition: border-color .18s ease, border-radius .28s var(--spring);
 }
 .app-shell.dragging { cursor: grabbing; }
 .app-shell.expanded { padding: 28px; border-radius: 28px; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto auto 1fr; gap: 0 30px; }
@@ -436,7 +415,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
     --text-muted: #8e8e93;
     --separator: rgba(255,255,255,.085);
     --separator-strong: rgba(255,255,255,.145);
-    --surface: rgba(23, 28, 36, .76);
+    --shell-top: 43 49 60;
+    --shell-bottom: 22 27 35;
+    --shell-border-rgb: 255 255 255;
+    --shell-border-alpha: .16;
     --material: rgba(49,54,64,.56);
     --material-solid: rgba(42,47,57,.9);
     --control: rgba(118,118,128,.15);
@@ -455,8 +437,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
     --calendar-beam-fade-a: rgba(10, 132, 255, 0);
     --calendar-beam-fade-b: rgba(103, 232, 249, 0);
   }
-  .app-shell::before { background: radial-gradient(100% 66% at 92% -12%, rgba(10,132,255,.2), transparent 60%), radial-gradient(72% 58% at -8% 106%, rgba(89,121,180,.15), transparent 64%), linear-gradient(145deg, rgba(45,51,62,.82), var(--surface)); box-shadow: 0 28px 72px var(--shadow), 0 5px 16px rgba(0,0,0,.2), inset 0 1px var(--glass-highlight), inset 0 0 0 .5px rgba(255,255,255,.035); }
-  .app-shell.desktop-widget::before { box-shadow: 0 12px 36px rgba(0,0,0,.28), inset 0 .5px rgba(255,255,255,.18); }
+  .app-shell.desktop-widget { box-shadow: 0 12px 36px rgba(0,0,0,.28), inset 0 .5px rgba(255,255,255,.18); }
   .filters button:hover:not(.active) { background: rgba(255,255,255,.05); }
   .icon-button:hover, .icon-button.pressed, .calendar-toolbar button:hover { background: var(--glass-hover); }
   .filters button.active, .view-tabs button.active, .segmented button.active, .schedule-mode button.active { background: rgba(255,255,255,.13); box-shadow: 0 3px 9px rgba(0,0,0,.22), inset 0 1px rgba(255,255,255,.14); }
@@ -484,7 +465,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 @media (prefers-reduced-transparency: reduce) {
   :root {
-    --surface: #f2f5f9;
     --glass-thin: #f1f4f8;
     --glass-regular: #f5f7fa;
     --glass-raised: #fafbfd;
@@ -493,7 +473,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
     --content-fill: #fff;
     --content-fill-hover: #fff;
   }
-  .app-shell, .app-shell::before, .top-actions, .filters, .view-tabs, .app-menu, .modal, .segmented, .schedule-mode, .toast {
+  .app-shell {
+    background-color: rgb(var(--shell-bottom));
+    background-image: none;
+  }
+  .top-actions, .filters, .view-tabs, .app-menu, .modal, .segmented, .schedule-mode, .toast {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
@@ -502,7 +486,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 @media (prefers-color-scheme: dark) and (prefers-reduced-transparency: reduce) {
   :root {
-    --surface: #20242c;
     --glass-thin: #343943;
     --glass-regular: #383e49;
     --glass-raised: #2b3039;
@@ -514,13 +497,13 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :root { --surface: rgba(246,248,251,.99); --glass-thin: rgba(246,248,251,.98); --glass-regular: rgba(248,250,252,.98); --glass-raised: rgba(250,251,253,.99); --content-fill: rgba(255,255,255,.96); --content-fill-hover: #fff; }
+  :root { --glass-thin: rgba(246,248,251,.98); --glass-regular: rgba(248,250,252,.98); --glass-raised: rgba(250,251,253,.99); --content-fill: rgba(255,255,255,.96); --content-fill-hover: #fff; }
   .modal-backdrop { background: rgba(10,15,24,.34); }
 }
 
 @media (prefers-color-scheme: dark) {
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    :root { --surface: rgba(30,33,40,.99); --glass-thin: rgba(48,53,63,.99); --glass-regular: rgba(52,58,69,.99); --glass-raised: rgba(42,47,57,.99); --content-fill: rgba(49,54,64,.98); --content-fill-hover: rgba(60,66,78,.99); }
+    :root { --glass-thin: rgba(48,53,63,.99); --glass-regular: rgba(52,58,69,.99); --glass-raised: rgba(42,47,57,.99); --content-fill: rgba(49,54,64,.98); --content-fill-hover: rgba(60,66,78,.99); }
   }
 }
 
