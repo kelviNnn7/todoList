@@ -13,10 +13,13 @@ if ! command -v xcodegen >/dev/null 2>&1; then
   exit 1
 fi
 
+version="$(node scripts/verify-app-version.mjs --print-version)"
+build_version="$version"
+
 npm run check
 npm run tauri build -- --bundles app
 xcodegen generate --spec native/project.yml --project native
-xcodebuild -project native/DesktopWidgets.xcodeproj -scheme DesktopWidgets -configuration Release -derivedDataPath native/build CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project native/DesktopWidgets.xcodeproj -scheme DesktopWidgets -configuration Release -derivedDataPath native/build CODE_SIGNING_ALLOWED=NO MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build_version" build
 
 app_path="src-tauri/target/release/bundle/macos/BluNote.app"
 products="native/build/Build/Products/Release"
@@ -28,15 +31,23 @@ codesign --force --options runtime --sign - --entitlements native/TaskWidget/Tas
 codesign --force --options runtime --sign - "$app_path/Contents/MacOS/WidgetReloader"
 codesign --force --options runtime --sign - --entitlements src-tauri/entitlements.plist "$app_path"
 codesign --verify --deep --strict --verbose=2 "$app_path"
+bash scripts/verify-macos-bundle.sh "$app_path" "$version"
 
 architecture="$(uname -m)"
 output_dir="src-tauri/target/release/bundle/dmg"
-version="$(node -p "require('./package.json').version")"
 output_path="$output_dir/BluNote_${version}_${architecture}.dmg"
 staging="$(mktemp -d)"
-trap 'rm -rf "$staging"' EXIT
+mount_point="$(mktemp -d)"
+cleanup() {
+  hdiutil detach "$mount_point" >/dev/null 2>&1 || true
+  rm -rf "$staging" "$mount_point"
+}
+trap cleanup EXIT
 cp -R "$app_path" "$staging/"
 ln -s /Applications "$staging/Applications"
 mkdir -p "$output_dir"
 hdiutil create -volname "BluNote" -srcfolder "$staging" -ov -format UDZO "$output_path"
+hdiutil attach "$output_path" -nobrowse -readonly -mountpoint "$mount_point" >/dev/null
+bash scripts/verify-macos-bundle.sh "$mount_point/BluNote.app" "$version"
+hdiutil detach "$mount_point" >/dev/null
 echo "$output_path"

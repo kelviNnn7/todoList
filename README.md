@@ -112,13 +112,16 @@ npm run dev
 
 ```bash
 npm run check
+npm run verify:version
 cargo fmt --manifest-path src-tauri/Cargo.toml --check
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
 cargo audit --file src-tauri/Cargo.lock
 ```
 
-`npm run check` 会依次执行 ESLint、Vitest 和生产构建。提交前还应运行 `npm audit --audit-level=moderate` 与 `cargo audit --file src-tauri/Cargo.lock`（首次使用需 `cargo install cargo-audit --locked`）；GitHub Actions 会运行依赖审计并构建 macOS 安装包。
+`npm run check` 会依次执行 ESLint、带覆盖率的 Vitest 和生产构建。覆盖率门禁固定为 `src/lib/**/*.ts` 核心逻辑 statements 与 lines 均不低于 90%；覆盖范围包含全部核心模块，不使用 ignore 或排除低覆盖文件。当前全项目覆盖率不作为 90% 门禁，实际数值以 `coverage/coverage-summary.json` 为准。
+
+`npm run verify:version` 校验 `package.json`、`src-tauri/tauri.conf.json` 与 `src-tauri/Cargo.toml` 的版本完整性，主版本不一致或完整版本漂移都会直接失败。提交前还应运行 `npm audit --audit-level=moderate` 与 `cargo audit --file src-tauri/Cargo.lock`（首次使用需 `cargo install cargo-audit --locked`）；GitHub Actions 会运行依赖审计、覆盖率门禁并构建 macOS 安装包。
 
 常用命令：
 
@@ -126,7 +129,8 @@ cargo audit --file src-tauri/Cargo.lock
 |---|---|
 | `npm run dev` | 启动 Vite 开发服务器 |
 | `npm run test` | 执行前端测试 |
-| `npm run test:coverage` | 生成前端覆盖率报告 |
+| `npm run test:coverage` | 生成核心逻辑覆盖率报告并执行 90% 阈值 |
+| `npm run verify:version` | 校验 package/Tauri/Cargo 版本一致性 |
 | `npm run lint` | 执行 ESLint |
 | `npm run build` | 执行 TypeScript 与 Vite 生产构建 |
 | `npm run check` | 执行前端完整质量检查 |
@@ -151,7 +155,9 @@ npm run tauri build
 bash scripts/build-macos-dmg.sh
 ```
 
-该脚本会构建主应用、WidgetKit 扩展和刷新桥接程序，将扩展嵌入应用后进行签名与 DMG 封装。未配置 Developer ID 时生成的本地签名安装包只适合开发验收，不能替代正式签名和 Apple 公证。
+该脚本会构建主应用、WidgetKit 扩展和刷新桥接程序，将扩展嵌入应用后进行签名与 DMG 封装。版本以 `package.json` 为唯一来源：脚本先调用 `verify-app-version` 校验 Tauri/Cargo 版本，再把 `MARKETING_VERSION` 与 `CURRENT_PROJECT_VERSION` 注入 `xcodebuild`，避免 Widget 的 `Info.plist` 写死旧版本。构建完成后会校验主应用与 `TaskWidget.appex` 的 `CFBundleShortVersionString`、`CFBundleVersion` 均与 `package.json` 一致，并在 DMG 挂载后再次校验同一组版本。
+
+macOS CI 会为每个提交构建包含 WidgetKit 的完整 DMG，产物名称为 `macos-dmg-<git-sha>`。未配置 Developer ID 时生成的本地签名安装包只适合开发验收，不能替代正式签名和 Apple 公证。
 
 ## 数据与隐私
 
@@ -184,8 +190,8 @@ bash scripts/build-macos-dmg.sh
 - 当前不支持 Apple EventKit、Microsoft Outlook 账户直连，仅支持 ICS 文件导入。
 - macOS WidgetKit 需要完整 Xcode、App Group 和正式 Apple Team 签名。
 - 仅安装 Xcode Command Line Tools 时，`npm run tauri build` 只能生成主应用 DMG；包含 WidgetKit 扩展的 DMG 必须使用完整 Xcode。
-- 正式公开分发仍需完成 macOS Developer ID 签名与 Apple 公证。
-- 当前本地 macOS 安装包为 Apple Silicon `arm64`，Intel Mac 需要单独的 x86_64 或 Universal 2 构建。
+- 正式公开分发仍需完成 macOS Developer ID 签名与 Apple 公证；当前开发机未发现有效 codesigning identity，这是外部发布阻塞，不是代码缺陷。
+- 当前本地 macOS 安装包为 Apple Silicon `arm64`，Intel Mac 需要单独的 x86_64 或 Universal 2 构建；CI 产物架构以构建 runner 为准并在文件名中标注。
 
 ## 相关文档
 

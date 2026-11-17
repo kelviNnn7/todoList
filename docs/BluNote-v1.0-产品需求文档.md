@@ -4,7 +4,7 @@
 |---|---|
 | 文档类型 | 产品需求文档（PRD）与迭代台账 |
 | 目标版本 | v1.0 |
-| 需求文档版本 | v1.0-r13 |
+| 需求文档版本 | v1.0-r14 |
 | 当前开发基线 | `dev` / v0.3.6 |
 | 当前稳定基线 | `main` / v0.3.6 |
 | 目标平台 | macOS 13+ |
@@ -348,10 +348,10 @@ Acceptance Criteria:
 | FR-013 | ICS 导出 | P1 | 待实现 | 全量实现 |
 | FR-014 | 透明度、桌面模式、置顶与锁定 | P0 | 已实现 | 可访问性验证 |
 | FR-015 | 托盘、自启动与单实例 | P1 | 部分实现 | macOS 语义与回归 |
-| FR-016 | WidgetKit 小/中组件 | P1 | 部分实现 | 正式签名和真机验证 |
+| FR-016 | WidgetKit 小/中组件 | P1 | 部分实现 | 已补齐构建变量注入与 CI 完整 DMG 构建链路；正式签名和真机验证仍阻断 |
 | FR-017 | BluNote 名称与最新图标全触点统一 | P0 | 已实现 | 安装升级缓存回归 |
 | FR-018 | 本地持久化与数据库迁移 | P0 | 部分实现 | 版本化迁移与损坏恢复 |
-| FR-019 | macOS DMG | P0 | 部分实现 | 签名、公证、arm64/x64 策略 |
+| FR-019 | macOS DMG | P0 | 部分实现 | 完整 WidgetKit DMG 已纳入 CI 并按提交 SHA 校验；签名、公证、arm64/x64 策略仍阻断 |
 | FR-020 | Windows 图形安装包 | P0 | 已撤销 | v0.3.6 已从 dev 删除实现与构建链路；历史记录保留 |
 | FR-021 | 麒麟 OS 自包含 DEB | P0 | 已撤销 | v0.3.6 已从 dev 删除实现与构建链路；历史记录保留 |
 | FR-022 | 搜索、优先级、标签和聚合视图 | P0 | 待实现 | 全量实现 |
@@ -410,6 +410,7 @@ Acceptance Criteria:
 | I-037 | v0.3.5 iOS Liquid Glass 全界面迭代 | 先将 main 精确复制到 dev，再使用 `affaan-m/ecc@liquid-glass-design` Skill 优化所有 UI | dev 已重置并同步 main；按共享玻璃容器、交互反馈、连续形变、减少嵌套和明暗/无障碍验证原则重构主窗口、导航、日历、事项卡、设置、表单、提示及 WidgetKit | FR-014、FR-016、FR-019、FR-031 | dev 已实现；紧凑态、展开态、设置和弹层截图及控制台通过，50 项前端测试、6 项 Rust 测试、Swift 语法解析、依赖审计和 arm64 DMG 完整性/包内签名结构校验通过；WidgetKit 完整类型检查与扩展编译受本机 Xcode/SDK 环境阻断，待完整 Xcode 和真机验证，未经批准不发布 main |
 | I-038 | v0.3.6 macOS-only 收敛 | 删除 dev 中全部 Windows 与麒麟实现，并清除旧产品名相关代码和注释 | 删除 Electron 运行时、DEB/NSIS 构建配置、平台专属图标与 CI；桌面桥接收敛为 Tauri；移除旧命名空间和数据库迁移分支；当前支持范围改为 macOS | FR-018、FR-019、FR-020、FR-021 | 已发布 main（2026-09-09 fast-forward）；48 项前端测试、5 项 Rust 测试、Clippy、Swift 语法解析、依赖审计和 arm64 DMG 挂载/版本/签名校验通过；本次 r13 补记发布状态与稳定基线 |
 | I-039 | v0.3.6 发布基线对账与工程治理 | 修正文档中的稳定基线、I-038 状态与发布标签；恢复依赖审计门禁并清理遗留分支 | README/PRD 稳定基线统一为 v0.3.6；补 v0.3.4/v0.3.6 annotated tag；Node 22.13+ 与 ESLint 10/Vitest 5/Vite 8 工具链升级；npm audit 归零；rusqlite 0.41/libsqlite3-sys 0.39.1 修复 RUSTSEC-2026-0459；删除 dev-ql 与麒麟 WIP；残留品牌字符串改为领域命名；适配 React Hooks 7 的 setState-in-effect 规则 | 发布门禁、工程约束 | 已完成（2026-11-17）：npm audit 0；cargo audit 无漏洞（RUSTSEC-2026-0459 已修复，其余为非阻断警告）；49 项前端测试、5 项 Rust 测试、ESLint/Clippy/Swift 语法解析通过；标签与 dev-ql/stash 清理完成；主应用 arm64 DMG 已生成并校验（ad-hoc，无 WidgetKit 扩展） |
+| I-040 | v0.3.6 Widget 版本注入与核心覆盖率门禁 | 修复 Widget 版本写死、核心逻辑覆盖率无门禁、完整 WidgetKit DMG 只能人工构建的问题；保持 `main` 不变 | Widget `Info.plist` 改用 `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION`；打包脚本以 `package.json` 为版本源，校验 Tauri/Cargo 主版本及完整版本，注入 `xcodebuild`，并在应用包组装后与 DMG 挂载后校验主应用/appex 的 shortVersion/buildVersion；`src/lib/**/*.ts` 全模块纳入 coverage.include，新增边界、失败、持久化、权限与日期测试，设置 statements/lines ≥90% 的 glob 阈值并在 CI 执行覆盖率；macOS CI 按提交 SHA 构建完整 WidgetKit DMG 并上传 artifact；签名/公证资质缺口保留为外部阻塞 | FR-016、FR-019、发布门禁、工程约束 | dev 已完成（2026-11-17）：前端 98 项测试通过，核心 `src/lib` statements/lines 均 100%（branches 96.71%、functions 100%），全项目 statements 73.61%、lines 82.53% 如实记录且不作为门禁；5 项 Rust 测试、fmt、clippy 通过；版本一致性脚本与本机 lint/build 通过；完整 WidgetKit DMG 由同一提交 SHA 的 macOS CI 运行产出并下载校验；当前无有效 codesigning identity，正式签名/公证仍为外部阻塞，`main` 未变动 |
 
 ### Document Revision History
 
@@ -428,6 +429,7 @@ Acceptance Criteria:
 | v1.0-r11 | 2026-09-07 | v0.3.5 | 记录基于指定 liquid-glass-design Skill 的全界面材质、交互、WidgetKit 与跨平台回退迭代 |
 | v1.0-r12 | 2026-09-09 | v0.3.6 | 记录 dev 收敛为 macOS-only、撤销 Windows/麒麟交付要求及清除旧命名兼容代码 |
 | v1.0-r13 | 2026-11-17 | v0.3.6 | 修正 main 稳定基线为 v0.3.6、补记 I-038 已合并 main；记录 v0.3.6 发布标签、Node 22/依赖审计治理、RUSTSEC-2026-0459 修复与遗留分支清理 |
+| v1.0-r14 | 2026-11-17 | v0.3.6 | 记录 Widget 版本注入与打包后校验、核心逻辑覆盖率 90% 门禁、CI 完整 WidgetKit DMG 链路；区分核心覆盖率与全项目实际覆盖率，保留 Developer ID/公证外部阻塞及 main 未变动状态 |
 
 ### Requirement Traceability Rules
 
@@ -525,7 +527,7 @@ v1.0 需要增加或标准化：
 
 ### Test Strategy
 
-当前 dev/main v0.3.6 基线执行前端自动化、Rust 和 Swift 语法检查。v1.0 测试矩阵必须包括：
+当前 dev/main v0.3.6 基线执行前端自动化、`src/lib` 核心逻辑覆盖率门禁（statements/lines ≥ 90%）、Rust 和 Swift 语法检查。全项目覆盖率不作为 90% 门禁，PRD 的 90% 成功标准仅针对核心领域逻辑；实际全项目数值必须在测试证据中如实记录。v1.0 测试矩阵必须包括：
 
 1. **单元测试**：日期、周起始、排序、筛选、重复规则、提醒去重、迁移和字段校验。
 2. **组件测试**：任务/会议新增与编辑、滚动、50/50 布局、透明度、错误和空状态。

@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { calendarBadge, dateKey, itemOccurrenceForDate, itemsForDate, isOverdue, monthDays, weekDays } from "./calendar";
+import {
+  calendarBadge,
+  dateKey,
+  isItemScheduledForDate,
+  isOverdue,
+  itemDate,
+  itemOccurrenceForDate,
+  itemsForDate,
+  longDate,
+  monthDays,
+  sortItems,
+  weekDays,
+} from "./calendar";
 import type { TodoItem } from "../types";
 
 const item = (overrides: Partial<TodoItem> = {}): TodoItem => ({
@@ -78,5 +90,80 @@ describe("calendar", () => {
   it("已完成任务不会标记逾期", () => {
     expect(isOverdue(item(), new Date("2026-08-20T12:00:00Z"))).toBe(true);
     expect(isOverdue(item({ completed: true }), new Date("2026-08-20T12:00:00Z"))).toBe(false);
+  });
+  it("跨年周仍从周一开始并覆盖七天", () => {
+    expect(weekDays(new Date(2026, 11, 31)).map(dateKey)).toEqual([
+      "2026-12-28", "2026-12-29", "2026-12-30", "2026-12-31",
+      "2027-01-01", "2027-01-02", "2027-01-03",
+    ]);
+  });
+  it("月视图覆盖二月与闰年边界", () => {
+    const leapFebruary = monthDays(new Date(2028, 1, 15));
+    expect(leapFebruary[0].getDay()).toBe(1);
+    expect(leapFebruary.at(-1)?.getDay()).toBe(0);
+    expect(leapFebruary.some((day) => day.getMonth() === 1 && day.getDate() === 29)).toBe(true);
+
+    const completeFebruary = monthDays(new Date(2027, 1, 1));
+    expect(completeFebruary[0].getDay()).toBe(1);
+    expect(completeFebruary.at(-1)?.getDay()).toBe(0);
+    expect(completeFebruary.some((day) => day.getMonth() === 2 && day.getDate() === 1)).toBe(false);
+    expect(completeFebruary.some((day) => day.getMonth() === 1 && day.getDate() === 28)).toBe(true);
+  });
+  it("按任务截止时间或会议开始时间确定日期", () => {
+    expect(itemDate(item())?.getDate()).toBe(18);
+    expect(itemDate(item({ type: "meeting", startAt: new Date(2026, 7, 19, 9).toISOString() }))?.getDate()).toBe(19);
+    expect(itemDate(item({ dueAt: null }))).toBeNull();
+    expect(itemDate(item({ type: "meeting", startAt: null }))).toBeNull();
+  });
+  it("单日事项、会议与每周规则按日期匹配", () => {
+    const meeting = item({
+      type: "meeting",
+      dueAt: null,
+      startAt: new Date(2026, 7, 18, 9).toISOString(),
+      endAt: new Date(2026, 7, 18, 10).toISOString(),
+    });
+    expect(isItemScheduledForDate(meeting, new Date(2026, 7, 18, 12))).toBe(true);
+    expect(isItemScheduledForDate(meeting, new Date(2026, 7, 19, 12))).toBe(false);
+    expect(isItemScheduledForDate(item({ dueAt: null }), new Date(2026, 7, 18, 12))).toBe(false);
+
+    const weekly = item({ taskSchedule: { mode: "weekly", startsOn: "2026-08-18", weekdays: [2, 7] } });
+    expect(isItemScheduledForDate(weekly, new Date(2026, 7, 18))).toBe(true);
+    expect(isItemScheduledForDate(weekly, new Date(2026, 7, 23))).toBe(true);
+    expect(isItemScheduledForDate(weekly, new Date(2026, 7, 17))).toBe(false);
+    expect(isItemScheduledForDate(weekly, new Date(2026, 7, 20))).toBe(false);
+  });
+  it("非每周事项不生成发生实例", () => {
+    const single = item();
+    expect(itemOccurrenceForDate(single, new Date(2026, 7, 18))).toBe(single);
+  });
+  it("会议角标忽略已完成、缺少开始时间或已经开始会议", () => {
+    const date = new Date(2026, 7, 18, 12);
+    const now = new Date(2026, 7, 18, 10);
+    const meeting = item({
+      type: "meeting",
+      dueAt: null,
+      startAt: new Date(2026, 7, 18, 11).toISOString(),
+      endAt: new Date(2026, 7, 18, 12).toISOString(),
+    });
+    expect(calendarBadge([meeting], date, now)).toEqual({ count: 1, overdue: false });
+    expect(calendarBadge([meeting], date, new Date(2026, 7, 18, 11))).toEqual({ count: 0, overdue: false });
+    expect(calendarBadge([{ ...meeting, startAt: null }], date, now)).toEqual({ count: 0, overdue: false });
+    expect(calendarBadge([{ ...meeting, completed: true }], date, now)).toEqual({ count: 0, overdue: false });
+  });
+  it("逾期判断覆盖会议、无日期与当天截止", () => {
+    expect(isOverdue(item({ type: "meeting", dueAt: null, startAt: new Date(2026, 7, 18, 9).toISOString() }), new Date(2026, 7, 20, 10))).toBe(true);
+    expect(isOverdue(item({ dueAt: null }), new Date(2026, 7, 20, 10))).toBe(false);
+    expect(isOverdue(item({ dueAt: new Date(2026, 7, 20, 9).toISOString() }), new Date(2026, 7, 20, 18))).toBe(false);
+  });
+  it("格式化长日期与稳定排序", () => {
+    expect(longDate(new Date(2026, 7, 18))).toBe("8月18日 星期二");
+    const older = item({ id: "older", createdAt: "2026-08-18T00:00:00.000Z" });
+    const newer = item({ id: "newer", createdAt: "2026-08-19T00:00:00.000Z" });
+    const later = item({ id: "later", dueAt: new Date(2026, 7, 19, 12).toISOString() });
+    const completed = item({ id: "completed", completed: true, dueAt: null });
+    const undated = item({ id: "undated", dueAt: null });
+    expect(sortItems([completed, undated, older, later, newer]).map((entry) => entry.id)).toEqual([
+      "newer", "older", "later", "undated", "completed",
+    ]);
   });
 });
