@@ -409,7 +409,7 @@ Acceptance Criteria:
 | I-036 | v0.3.4 外观状态优化 | 移除字体大小右侧提示；逾期待办在日历上改用符合整体审美的橙色背景角标；更新后推送 main 并生成 main DMG | 隐藏可见档位百分比并保留读屏值；角标模型增加逾期状态，浅色使用低饱和橙色、深色使用系统橙色；完成全量回归后发布 main | FR-026、FR-028、FR-030、FR-019 | 已发布 main；前端、安全审计、macOS/Windows 原生 CI 全部通过，arm64 DMG 完整性已校验，待多机视觉验收 |
 | I-037 | v0.3.5 iOS Liquid Glass 全界面迭代 | 先将 main 精确复制到 dev，再使用 `affaan-m/ecc@liquid-glass-design` Skill 优化所有 UI | dev 已重置并同步 main；按共享玻璃容器、交互反馈、连续形变、减少嵌套和明暗/无障碍验证原则重构主窗口、导航、日历、事项卡、设置、表单、提示及 WidgetKit | FR-014、FR-016、FR-019、FR-031 | dev 已实现；紧凑态、展开态、设置和弹层截图及控制台通过，50 项前端测试、6 项 Rust 测试、Swift 语法解析、依赖审计和 arm64 DMG 完整性/包内签名结构校验通过；WidgetKit 完整类型检查与扩展编译受本机 Xcode/SDK 环境阻断，待完整 Xcode 和真机验证，未经批准不发布 main |
 | I-038 | v0.3.6 macOS-only 收敛 | 删除 dev 中全部 Windows 与麒麟实现，并清除旧产品名相关代码和注释 | 删除 Electron 运行时、DEB/NSIS 构建配置、平台专属图标与 CI；桌面桥接收敛为 Tauri；移除旧命名空间和数据库迁移分支；当前支持范围改为 macOS | FR-018、FR-019、FR-020、FR-021 | 已发布 main（2026-09-09 fast-forward）；48 项前端测试、5 项 Rust 测试、Clippy、Swift 语法解析、依赖审计和 arm64 DMG 挂载/版本/签名校验通过；本次 r13 补记发布状态与稳定基线 |
-| I-039 | v0.3.6 发布基线对账与工程治理 | 修正文档中的稳定基线、I-038 状态与发布标签；恢复依赖审计门禁并清理遗留分支 | README/PRD 稳定基线统一为 v0.3.6；补 v0.3.4/v0.3.6 annotated tag；Node 22.13+ 与 ESLint 10/Vitest 5/Vite 8 工具链升级；npm audit 归零；删除 dev-ql 与麒麟 WIP；残留品牌字符串改为领域命名；适配 React Hooks 7 的 setState-in-effect 规则 | 发布门禁、工程约束 | 已完成（2026-11-17）：npm audit 0；49 项前端测试、5 项 Rust 测试、ESLint/Clippy/Swift 语法解析通过；标签与 dev-ql/stash 清理完成；主应用 arm64 DMG 已生成并校验（ad-hoc，无 WidgetKit 扩展） |
+| I-039 | v0.3.6 发布基线对账与工程治理 | 修正文档中的稳定基线、I-038 状态与发布标签；恢复依赖审计门禁并清理遗留分支 | README/PRD 稳定基线统一为 v0.3.6；补 v0.3.4/v0.3.6 annotated tag；Node 22.13+ 与 ESLint 10/Vitest 5/Vite 8 工具链升级；npm audit 归零；rusqlite 0.41/libsqlite3-sys 0.39.1 修复 RUSTSEC-2026-0459；删除 dev-ql 与麒麟 WIP；残留品牌字符串改为领域命名；适配 React Hooks 7 的 setState-in-effect 规则 | 发布门禁、工程约束 | 已完成（2026-11-17）：npm audit 0；cargo audit 无漏洞（RUSTSEC-2026-0459 已修复，其余为允许的 unmaintained 警告）；49 项前端测试、5 项 Rust 测试、ESLint/Clippy/Swift 语法解析通过；标签与 dev-ql/stash 清理完成；主应用 arm64 DMG 已生成并校验（ad-hoc，无 WidgetKit 扩展） |
 
 ### Document Revision History
 
@@ -427,7 +427,7 @@ Acceptance Criteria:
 | v1.0-r10 | 2026-09-07 | v0.3.4 | 记录 v0.3.4 main 发布、双平台 CI 与 DMG 完整性验证结果 |
 | v1.0-r11 | 2026-09-07 | v0.3.5 | 记录基于指定 liquid-glass-design Skill 的全界面材质、交互、WidgetKit 与跨平台回退迭代 |
 | v1.0-r12 | 2026-09-09 | v0.3.6 | 记录 dev 收敛为 macOS-only、撤销 Windows/麒麟交付要求及清除旧命名兼容代码 |
-| v1.0-r13 | 2026-11-17 | v0.3.6 | 修正 main 稳定基线为 v0.3.6、补记 I-038 已合并 main；记录 v0.3.6 发布标签、Node 22/依赖审计治理与遗留分支清理 |
+| v1.0-r13 | 2026-11-17 | v0.3.6 | 修正 main 稳定基线为 v0.3.6、补记 I-038 已合并 main；记录 v0.3.6 发布标签、Node 22/依赖审计治理、RUSTSEC-2026-0459 修复与遗留分支清理 |
 
 ### Requirement Traceability Rules
 

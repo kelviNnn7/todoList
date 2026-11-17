@@ -115,9 +115,10 @@ npm run check
 cargo fmt --manifest-path src-tauri/Cargo.toml --check
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
+cargo audit --file src-tauri/Cargo.lock
 ```
 
-`npm run check` 会依次执行 ESLint、Vitest 和生产构建。提交前还应运行 `npm audit --audit-level=moderate`；GitHub Actions 会运行依赖审计并构建 macOS 安装包。
+`npm run check` 会依次执行 ESLint、Vitest 和生产构建。提交前还应运行 `npm audit --audit-level=moderate` 与 `cargo audit --file src-tauri/Cargo.lock`（首次使用需 `cargo install cargo-audit --locked`）；GitHub Actions 会运行依赖审计并构建 macOS 安装包。
 
 常用命令：
 

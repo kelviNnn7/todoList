@@ -37,6 +37,6 @@ jobs:
       - run: bash scripts/build-macos-dmg.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: blunote-macos-${{ github.sha }}
+          name: macos-dmg-${{ github.sha }}
           path: src-tauri/target/release/bundle/dmg/*.dmg
           if-no-files-found: error
