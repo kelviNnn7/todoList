@@ -57,6 +57,8 @@ export default function App() {
   const importInput = useRef<HTMLInputElement>(null);
   const menuContainer = useRef<HTMLSpanElement>(null);
   const itemsRef = useRef(items);
+  const draggingRef = useRef(false);
+  const dragTokenRef = useRef(0);
   const systemDateKey = useRef(dateKey(calendarNow));
   const days = useMemo(() => viewMode === "week" ? weekDays(calendarAnchor) : monthDays(calendarAnchor), [calendarAnchor, viewMode]);
 
@@ -73,6 +75,12 @@ export default function App() {
     }
     setCalendarNow(now);
   }, [showToday]);
+  const endWindowDrag = useCallback((token?: number) => {
+    if (token !== undefined && token !== dragTokenRef.current) return;
+    draggingRef.current = false;
+    dragTokenRef.current += 1;
+    setDragging(false);
+  }, []);
 
   useEffect(() => { itemsRef.current = items; }, [items]);
   useEffect(() => { loadItems().then(setItems).finally(() => setLoading(false)); }, []);
@@ -105,10 +113,23 @@ export default function App() {
     return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
   }, [menuOpen]);
   useEffect(() => {
-    const endDrag = () => setDragging(false);
-    window.addEventListener("pointerup", endDrag); window.addEventListener("blur", endDrag);
-    return () => { window.removeEventListener("pointerup", endDrag); window.removeEventListener("blur", endDrag); };
-  }, []);
+    const endDrag = () => endWindowDrag();
+    const endDragWhenHidden = () => {
+      if (document.visibilityState === "hidden") endWindowDrag();
+    };
+    window.addEventListener("pointerup", endDrag);
+    window.addEventListener("pointercancel", endDrag);
+    window.addEventListener("mouseup", endDrag);
+    window.addEventListener("blur", endDrag);
+    document.addEventListener("visibilitychange", endDragWhenHidden);
+    return () => {
+      window.removeEventListener("pointerup", endDrag);
+      window.removeEventListener("pointercancel", endDrag);
+      window.removeEventListener("mouseup", endDrag);
+      window.removeEventListener("blur", endDrag);
+      document.removeEventListener("visibilitychange", endDragWhenHidden);
+    };
+  }, [endWindowDrag]);
   useEffect(() => {
     if (!isDesktopRuntime()) return;
     let unlisten: (() => void) | undefined;
@@ -236,12 +257,23 @@ export default function App() {
     if (!isDesktopRuntime()) return;
     void startResizeDragging(direction);
   }
-  function startWindowDrag(event: React.MouseEvent) {
-    if (locked || event.button !== 0 || (event.target as HTMLElement).closest("button,input,select,textarea,a,label,.app-menu,[role=separator]")) return;
+  async function startWindowDrag(event: React.MouseEvent) {
+    if (locked || draggingRef.current || event.button !== 0 || (event.target as HTMLElement).closest("button,input,select,textarea,a,label,.app-menu,[role=separator]")) return;
     event.preventDefault();
+    // macOS 原生拖动循环可能吞掉 pointerup，startDragging promise 是主结束信号；
+    // blur/pointercancel/页面隐藏是兜底。token 防止迟到的旧 promise 清掉新的拖动。
+    draggingRef.current = true;
+    const token = dragTokenRef.current + 1;
+    dragTokenRef.current = token;
     setDragging(true);
-    if (!isDesktopRuntime()) return;
-    void startDragging().catch(() => setNotice("窗口拖动启动失败，请重试"));
+    if (!isDesktopRuntime()) { endWindowDrag(token); return; }
+    try {
+      await startDragging();
+    } catch {
+      setNotice("窗口拖动启动失败，请重试");
+    } finally {
+      endWindowDrag(token);
+    }
   }
   return <main className={`app-shell ${expandedWindow ? "expanded" : ""} ${desktopWidget ? "desktop-widget" : ""} ${locked ? "position-locked" : ""} ${dragging ? "dragging" : ""}`} style={{ "--widget-opacity": appearanceOpacity / 100, "--font-scale": fontScale[appearanceFontLevel] } as React.CSSProperties}>
     {resizeDirections.map((direction) => <div key={direction} className={`window-resize-handle resize-${direction.toLowerCase()}`} aria-hidden="true" onPointerDown={(event) => startWindowResize(direction, event)}/>)}

@@ -34,6 +34,16 @@
   --spring: cubic-bezier(.2, .82, .2, 1);
   --widget-opacity: .95;
   --font-scale: 1;
+  --calendar-beam-a: rgba(0, 122, 255, .82);
+  --calendar-beam-b: rgba(52, 211, 235, .8);
+  --calendar-beam-fade-a: rgba(0, 122, 255, 0);
+  --calendar-beam-fade-b: rgba(52, 211, 235, 0);
+}
+
+@property --calendar-beam-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
 }
 
 * { box-sizing: border-box; }
@@ -45,6 +55,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   outline-offset: 2px;
 }
 
+/* 用户透明度只作用于玻璃背景层，文字与控件保持不透明，避免 55% 档位下可读性下降。 */
 .app-shell {
   position: relative;
   isolation: isolate;
@@ -53,7 +64,20 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   padding: 20px 16px 16px;
   overflow: hidden;
   border: 1px solid var(--glass-outline);
+  border-color: color-mix(in srgb, var(--glass-outline) calc(var(--widget-opacity) * 100%), transparent);
   border-radius: 24px;
+  background: transparent;
+  display: grid;
+  grid-template-rows: auto auto auto 1fr;
+  transition: border-color .18s ease, border-radius .28s var(--spring);
+}
+.app-shell::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
   background:
     radial-gradient(100% 66% at 92% -12%, rgba(82, 166, 255, .28), transparent 60%),
     radial-gradient(72% 58% at -8% 106%, rgba(177, 219, 255, .2), transparent 64%),
@@ -63,23 +87,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
     0 5px 16px rgba(35, 57, 88, .08),
     inset 0 1px var(--glass-highlight),
     inset 0 0 0 .5px rgba(69, 101, 143, .07);
-  opacity: var(--widget-opacity);
   backdrop-filter: saturate(185%) contrast(104%) blur(40px);
   -webkit-backdrop-filter: saturate(185%) contrast(104%) blur(40px);
-  display: grid;
-  grid-template-rows: auto auto auto 1fr;
-  transition: opacity .18s ease, border-radius .28s var(--spring), box-shadow .28s var(--spring);
-}
-.app-shell::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: 1px;
-  pointer-events: none;
-  border-radius: inherit;
-  background:
-    linear-gradient(116deg, rgba(255,255,255,.52), transparent 24%, transparent 70%, rgba(255,255,255,.16)),
-    radial-gradient(58% 8% at 50% 0, rgba(255,255,255,.7), transparent 72%);
+  opacity: var(--widget-opacity);
+  transition: opacity .18s ease;
 }
 .app-shell::after {
   content: "";
@@ -88,9 +99,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   inset: 0;
   pointer-events: none;
   border-radius: inherit;
+  background:
+    linear-gradient(116deg, rgba(255,255,255,.52), transparent 24%, transparent 70%, rgba(255,255,255,.16)),
+    radial-gradient(58% 8% at 50% 0, rgba(255,255,255,.7), transparent 72%);
   box-shadow: inset 0 -1px rgba(69,101,143,.08), inset 1px 0 rgba(255,255,255,.3), inset -1px 0 rgba(255,255,255,.18);
+  opacity: var(--widget-opacity);
+  transition: opacity .18s ease;
 }
-.app-shell.dragging { opacity: .7; cursor: grabbing; }
+.app-shell.dragging { cursor: grabbing; }
 .app-shell.expanded { padding: 28px; border-radius: 28px; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto auto 1fr; gap: 0 30px; }
 .drag-region { position: absolute; z-index: 2; top: 0; left: 44px; right: 44px; height: 14px; cursor: grab; -webkit-app-region: drag; }
 .topbar { cursor: grab; -webkit-app-region: drag; }
@@ -207,7 +223,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .font-scale-ticks i { font-style: normal; }
 .menu-divider { height: .5px; margin: 4px 7px; background: var(--separator); }
 .menu-footnote { display: block; margin-top: 3px; padding: 7px 8px 4px; border-top: .5px solid var(--separator); color: var(--text-muted); font-size: calc(9px * var(--font-scale)); }
-.desktop-widget { box-shadow: 0 12px 36px rgba(20,28,45,.1), inset 0 .5px rgba(255,255,255,.9); }
+.app-shell.desktop-widget::before { box-shadow: 0 12px 36px rgba(20,28,45,.1), inset 0 .5px rgba(255,255,255,.9); }
 .desktop-widget .top-actions { opacity: .68; transition: opacity .18s ease; }
 .desktop-widget:hover .top-actions, .desktop-widget:focus-within .top-actions { opacity: 1; }
 .visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; border: 0 !important; }
@@ -234,7 +250,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .calendar-grid button:hover:not(.selected) { background: var(--glass-hover); transform: scale(1.035); }
 .calendar-grid button span { font-size: calc(8.5px * var(--font-scale)); line-height: 13px; color: var(--text-muted); }
 .calendar-grid button strong { width: 25px; height: 25px; color: var(--text); border-radius: 50%; font-size: calc(12.5px * var(--font-scale)); line-height: 25px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.calendar-grid button i { position: absolute; right: 3px; top: 2px; min-width: 11px; height: 11px; padding: 0 3px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); font-size: calc(7px * var(--font-scale)); line-height: 11px; font-style: normal; font-weight: 700; }
+.calendar-grid button i { position: absolute; z-index: 3; right: 3px; top: 2px; min-width: 11px; height: 11px; padding: 0 3px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); font-size: calc(7px * var(--font-scale)); line-height: 11px; font-style: normal; font-weight: 700; }
 .calendar-grid button.today strong { box-shadow: inset 0 0 0 1px var(--accent); color: var(--accent); }
 .calendar-grid button.selected { border-color: rgba(0,122,255,.13); background: linear-gradient(160deg, rgba(255,255,255,.56), var(--accent-soft)); box-shadow: inset 0 1px rgba(255,255,255,.62), 0 4px 12px rgba(0,122,255,.1); }
 .calendar-grid button.selected span { color: var(--accent); font-weight: 650; }
@@ -247,6 +263,40 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .calendar-panel.month .calendar-grid button strong { width: 23px; height: 23px; line-height: 23px; font-size: calc(11px * var(--font-scale)); }
 .calendar-panel.month .calendar-grid button i { right: 1px; top: 1px; }
 .calendar-grid button.outside-month { opacity: .34; }
+.calendar-grid button::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: conic-gradient(
+    from var(--calendar-beam-angle),
+    var(--calendar-beam-fade-a) 0 64%,
+    var(--calendar-beam-a) 76%,
+    var(--calendar-beam-b) 86%,
+    var(--calendar-beam-fade-b) 96%,
+    transparent 100%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  transition: opacity .16s ease;
+}
+.calendar-grid button:hover::after,
+.calendar-grid button:focus-visible::after {
+  opacity: 1;
+  animation: calendar-beam-spin 2.8s linear infinite;
+}
+.calendar-grid button.selected::after {
+  --calendar-beam-a: rgba(255, 255, 255, .95);
+  --calendar-beam-b: rgba(103, 232, 249, .95);
+  --calendar-beam-fade-a: rgba(255, 255, 255, 0);
+  --calendar-beam-fade-b: rgba(103, 232, 249, 0);
+}
 
 .agenda { min-height: 0; padding-top: 13px; display: flex; flex-direction: column; }
 .agenda-heading { display: flex; justify-content: space-between; align-items: flex-end; padding: 0 2px 9px; }
@@ -364,6 +414,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .expanded .item-card { margin-bottom: 0; }
 .expanded .empty-state { grid-column: 1 / -1; min-height: 112px; }
 
+@keyframes calendar-beam-spin { to { --calendar-beam-angle: 360deg; } }
 @keyframes menu-in { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 5px); } }
 @keyframes backdrop-in { from { opacity: 0; } }
@@ -399,8 +450,13 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
     --content-fill-hover: rgba(66,74,87,.72);
     --shadow: rgba(0,0,0,.42);
     --glass-shadow: rgba(0,0,0,.4);
+    --calendar-beam-a: rgba(10, 132, 255, .92);
+    --calendar-beam-b: rgba(103, 232, 249, .9);
+    --calendar-beam-fade-a: rgba(10, 132, 255, 0);
+    --calendar-beam-fade-b: rgba(103, 232, 249, 0);
   }
-  .app-shell { background: radial-gradient(100% 66% at 92% -12%, rgba(10,132,255,.2), transparent 60%), radial-gradient(72% 58% at -8% 106%, rgba(89,121,180,.15), transparent 64%), linear-gradient(145deg, rgba(45,51,62,.82), var(--surface)); box-shadow: 0 28px 72px var(--shadow), 0 5px 16px rgba(0,0,0,.2), inset 0 1px var(--glass-highlight), inset 0 0 0 .5px rgba(255,255,255,.035); }
+  .app-shell::before { background: radial-gradient(100% 66% at 92% -12%, rgba(10,132,255,.2), transparent 60%), radial-gradient(72% 58% at -8% 106%, rgba(89,121,180,.15), transparent 64%), linear-gradient(145deg, rgba(45,51,62,.82), var(--surface)); box-shadow: 0 28px 72px var(--shadow), 0 5px 16px rgba(0,0,0,.2), inset 0 1px var(--glass-highlight), inset 0 0 0 .5px rgba(255,255,255,.035); }
+  .app-shell.desktop-widget::before { box-shadow: 0 12px 36px rgba(0,0,0,.28), inset 0 .5px rgba(255,255,255,.18); }
   .filters button:hover:not(.active) { background: rgba(255,255,255,.05); }
   .icon-button:hover, .icon-button.pressed, .calendar-toolbar button:hover { background: var(--glass-hover); }
   .filters button.active, .view-tabs button.active, .segmented button.active, .schedule-mode button.active { background: rgba(255,255,255,.13); box-shadow: 0 3px 9px rgba(0,0,0,.22), inset 0 1px rgba(255,255,255,.14); }
@@ -437,7 +493,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
     --content-fill: #fff;
     --content-fill-hover: #fff;
   }
-  .app-shell, .top-actions, .filters, .view-tabs, .app-menu, .modal, .segmented, .schedule-mode, .toast {
+  .app-shell, .app-shell::before, .top-actions, .filters, .view-tabs, .app-menu, .modal, .segmented, .schedule-mode, .toast {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
@@ -470,4 +526,10 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+  .calendar-grid button::after { transition: none; }
+  .calendar-grid button:hover::after,
+  .calendar-grid button:focus-visible::after {
+    animation: none;
+    background: linear-gradient(135deg, var(--calendar-beam-a), var(--calendar-beam-b));
+  }
 }
