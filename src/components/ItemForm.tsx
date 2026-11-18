@@ -48,7 +48,7 @@ export function ItemForm({ date, initialType, initialItem, anchor, openModality 
   const [draft, setDraft] = useState(() => initialDraft(date, initialType, initialItem));
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [advanced, setAdvanced] = useState(Boolean(initialItem));
+  const [advanced, setAdvanced] = useState(Boolean(initialItem) || initialType === "meeting");
   const [phase, setPhase] = useState<"entering" | "open" | "closing">("entering");
   const [placement, setPlacement] = useState<Placement>({ top: 52, left: 8, width: 400, maxHeight: 520, origin: "top right" });
   const [saveError, setSaveError] = useState("");
@@ -188,6 +188,7 @@ export function ItemForm({ date, initialType, initialItem, anchor, openModality 
   }
 
   const dateText = isValid(parseISO(draft.date)) ? `${format(parseISO(draft.date), "M月d日")} · ${format(parseISO(draft.date), "EEEE", { locale: zhCN })}` : "选择日期";
+  const advancedSummary = draft.type === "task" ? "备注、提醒、重复与子任务" : "时间、地点、链接与提醒";
   const dialogTitle = initialItem ? `编辑${draft.type === "meeting" ? "会议" : "任务"}` : "新建事项";
   const saveLabel = saving ? "保存中…" : initialItem ? "保存修改" : draft.type === "meeting" ? "保存会议" : "保存任务";
 
@@ -222,7 +223,7 @@ export function ItemForm({ date, initialType, initialItem, anchor, openModality 
         </label>
         <button type="button" className="more-toggle" aria-expanded={advanced} aria-controls="item-more-settings" onClick={() => setAdvanced((value) => !value)}>
           <span>{advanced ? "收起更多设置" : "更多设置"}</span>
-          <small>{draft.type === "task" ? "备注、提醒、重复与子任务" : "时间、地点、链接与提醒"}</small>
+          <small>{advanced ? "已展开，可直接编辑" : advancedSummary}</small>
           <ChevronDown size={15} className={advanced ? "open" : ""}/>
         </button>
         {advanced && <div className="extra-fields" id="item-more-settings">

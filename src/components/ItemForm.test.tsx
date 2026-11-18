@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { format, parseISO } from "date-fns";
 import { describe, expect, it, vi } from "vitest";
 import type { TodoItem } from "../types";
 import { ItemForm } from "./ItemForm";
@@ -81,6 +82,31 @@ describe("ItemForm editing", () => {
 });
 
 describe("ItemForm quick create and failure handling", () => {
+  it("会议初始类型直接展开时间字段，鼠标和键盘都可编辑默认值", async () => {
+    const user = userEvent.setup(); const onSave = vi.fn().mockResolvedValue(undefined);
+    render(<ItemForm date={new Date(2026, 10, 17)} initialType="meeting" onClose={vi.fn()} onSave={onSave}/>);
+
+    const start = screen.getByLabelText("开始时间");
+    const end = screen.getByLabelText("结束时间");
+    expect(start).toHaveValue("09:30");
+    expect(end).toHaveValue("10:00");
+    expect(screen.getByLabelText("提前提醒")).toHaveValue("15");
+    expect(screen.getByText("已展开，可直接编辑")).toBeInTheDocument();
+
+    start.focus();
+    expect(start).toHaveFocus();
+    fireEvent.change(start, { target: { value: "10:15" } });
+    await user.click(end);
+    expect(end).toHaveFocus();
+    fireEvent.change(end, { target: { value: "11:00" } });
+    await user.type(screen.getByLabelText("标题"), "直接编辑会议时间");
+    await user.click(screen.getByRole("button", { name: "保存会议" }));
+
+    const saved = onSave.mock.calls[0][0] as { startAt: string; endAt: string };
+    expect(format(parseISO(saved.startAt), "HH:mm")).toBe("10:15");
+    expect(format(parseISO(saved.endAt), "HH:mm")).toBe("11:00");
+  });
+
   it("只填标题即可保存，日期默认取当前选中日并立即聚焦标题", async () => {
     const user = userEvent.setup(); const onSave = vi.fn().mockResolvedValue(undefined); const onClose = vi.fn();
     render(<ItemForm date={new Date(2026, 10, 17)} initialType="task" onClose={onClose} onSave={onSave}/>);

@@ -4,9 +4,9 @@
 |---|---|
 | 文档类型 | 产品需求文档（PRD）与迭代台账 |
 | 目标版本 | v1.0 |
-| 需求文档版本 | v1.0-r18 |
+| 需求文档版本 | v1.0-r19 |
 | 当前开发基线 | `dev` / v0.3.9 |
-| 当前稳定基线 | `main` / v0.3.6 |
+| 当前稳定基线 | `main` / v0.3.8 |
 | 目标平台 | macOS 13+ |
 | 文档状态 | Living Document |
 | 首次整理 | 2026-08-18 |
@@ -24,7 +24,7 @@ BluNote 是一款本地优先的桌面待办与会议挂件。产品已经经历
 
 ### Proposed Solution
 
-以 dev v0.3.9 为当前开发基线、main v0.3.6 为稳定发布基线，持续建设一个简洁、可拖拽、可缩放、可调整透明度和字体大小的 macOS 任务与会议中心。v1.0 在保留轻量挂件体验的同时，完成任务全生命周期、可靠提醒、搜索整理、重复计划、备份恢复和可发布的 macOS 安装链路。本地离线使用是默认能力，账号、云同步和团队协作不进入 v1.0。
+以 dev v0.3.9 为当前开发基线、main v0.3.8 为稳定发布基线，持续建设一个简洁、可拖拽、可缩放、可调整透明度和字体大小的 macOS 任务与会议中心。v1.0 在保留轻量挂件体验的同时，完成任务全生命周期、可靠提醒、搜索整理、重复计划、备份恢复和可发布的 macOS 安装链路。本地离线使用是默认能力，账号、云同步和团队协作不进入 v1.0。
 
 ### Success Criteria
 
@@ -257,7 +257,7 @@ As a macOS 用户, I want to 点击安装包即可安装和启动 so that 不需
 Acceptance Criteria:
 
 - macOS 提供可双击安装的 DMG。
-- `main` 当前稳定包为 v0.3.6 Apple Silicon DMG；`dev` 与 `main` 均仅保留 macOS 构建链路。
+- `main` 当前稳定包为 v0.3.8 Apple Silicon DMG；`dev` 与 `main` 均仅保留 macOS 构建链路。
 - 安装、覆盖升级、保留数据、卸载和重新安装均纳入测试矩阵。
 - 安装包明确标注架构；Apple Silicon 与 Intel Mac 不得混淆，必要时提供 universal 或分别提供 arm64/x64。
 
@@ -455,6 +455,7 @@ Acceptance Criteria:
 | I-041 | v0.3.7 日期光束与透明度稳定性 | 为周/月任意日期框增加悬停与键盘 focus-visible 的 border beam；修复切到窗口外再回来、拖动结束后背景透明度漂移；保持液态玻璃简约风格 | 日期格使用 CSS conic-gradient + mask 圆角细线光束，仅当前悬停/聚焦格动画，减少动态时降级为静态描边，不拦截点击、不遮挡日期/角标、不改变格子尺寸；用户透明度收敛到玻璃背景层，文字与控件保持清晰；拖动结束以原生 `startDragging` promise 为主信号，blur/pointercancel/visibilitychange 兜底，token 防止重入与迟到清理；保留 55%–100% 设置与持久化 | FR-014、FR-031、FR-032、FR-033 | dev 已实现（2026-11-17）：104 项前端测试通过，核心 `src/lib` statements/lines 100%（branches 96.71%、functions 100%）；`npm run check`、cargo fmt/clippy/test（5 项）通过；真实 Chromium 渲染回归覆盖 360×620 紧凑/900×640 展开、浅/深色、选中/今天/跨月、键盘 focus-visible、减少动态静态描边、55% 透明度与 blur/focus 稳定性，原型见 `output/ui-preview/`；完整 WidgetKit arm64 DMG 与 CI 结果由本轮交付报告给出；macOS 原生拖拽循环无法由浏览器自动化替代，真机手动拖动仍待复验；main 保持 v0.3.6 未改动 |
 | I-042 | v0.3.8 透明背景根因修复 | 修复 100% 仍透桌面、点击后才恢复的缺陷；确保冷启动首帧、失焦/激活、拖动前后 100% 真正不透明，55/75/95 按档位稳定可透 | 根因：v0.3.7 `.app-shell` 自身 `background: transparent`，可见背景全在 `z-index:-1` 的 `::before`/`::after`；基色 alpha .78/.68 再叠加 `backdrop-filter`，即使 `--widget-opacity:1` 仍透底，且 CSS 默认 .95 会先绘制一帧。v0.3.8 将确定性材质渐变直接绘制在 `.app-shell` 上，所有颜色只乘一次用户 alpha，100% 为真正不透明；移除外壳负层与外部 backdrop 合成，圆角外保持透明；新增 head 阻塞启动脚本同步读取 localStorage，React 初始化复用同一归一化函数；不增加依赖。验证：DOM/CSS/首帧测试使旧实现失败；真实 macOS WKWebView 以两个强对比背景截图，100% 首次绘制/ready/blur/focus/dragging/恢复显示平均像素差 ≤0.054（本地为 0），95/75/55 的平均像素差约 11.29/54.49/97.96（深色 55 约 99.50），证明低档仍可透且状态稳定；系统 key-window 激活在本机受前台应用激活限制，未作为已通过的稳定验收项 | FR-014、FR-031、FR-033、FR-034 | dev 已完成（2026-11-17）：前端 115 项测试通过，核心 `src/lib` statements/lines 100%（branches 96.83%、functions 100%），全项目 statements 78.26%、branches 80.85%、functions 70.46%、lines 88.13%；`npm run check`、npm audit 0、cargo fmt/clippy/test（5 项）通过；WKWebView 像素回归在本地与 macOS CI 均通过（100% 首次绘制/ready/blur/focus/dragging/恢复显示 A/B 平均差 ≤0.054、最大通道差 ≤2；95/75/55 平均差约 11.29/54.49/97.96，深色 55 约 99.50）；CI run 44113488195（frontend/native 均 success），完整 WidgetKit DMG `release/macos/BluNote_0.3.8_arm64_ci-179ce8a.dmg`，SHA-256 `2f0004cf7218eda4c6d74222b5d3821b213f605b62622bcd99b3fca614b42064`；主应用/Widget 0.3.8、主应用 arm64、Widget 通用、adhoc；系统 key-window 激活在本机与 CI 均因前台激活限制 `keyWindow=false`，未作为已通过项；实际 Tauri 窗口未做截屏像素采样；未关闭用户应用、未写入用户 SQLite、未安装替换 `/Applications`、未修改 `main` |
 | I-043 | v0.3.9 V2 桌面日程界面迭代 | 按「UI设计」V2 五页原型彻底重做组合布局、配色、组件层级和交互，同时保持桌面窗口、透明度、日历业务口径与 WidgetKit 范围 | 浅色近 #F7F8FA 外壳/白色分组面、钴蓝 #2448BE、细分隔，深色 #171D29/#222B3A 亮蓝强调；展开左清单右日历 50/50 并按全天/有时间共用表面，紧凑顶栏→日历→日期标题与分类→可滚动清单；周/月今天/翻页/视图、周一为首、今天下划线/选中蓝底/键盘外环/悬停换底并取消光束；周数字、月蓝/琥珀点，逾期含无障碍文本；锚定快速新增只填标题、按需展开、失败重试、防并发与焦点归还；完成原位保留、aria-live 提示及跨日期/重复例次撤销；55% 外壳透底而内容面不透明；版本 0.3.9，更新 README/PRD，仅提交 dev | FR-001、FR-002、FR-005、FR-009、FR-014、FR-026、FR-027、FR-028、FR-029、FR-030、FR-032、FR-034、FR-035、FR-036、FR-037、FR-038、FR-039 | dev 已完成（2026-11-18）：134 项前端测试通过，核心 `src/lib` statements/lines 100%（branches 96.69%、functions 100%）；`npm run check`、版本一致性、cargo fmt/clippy/test（5 项）通过；真实 Chromium 生产构建渲染展开浅色月、紧凑浅色周、紧凑深色月、55%、快速新增、详情/撤销、340×520 四档字体/周月视图与键盘/布局冒烟通过，证据输出 ignored `output/ui-v2/`；真实 WKWebView 双背景像素回归通过，100% 背景差 0，95/75/55 平均差约 12.27/59.38/106.73，深色 55 同档；采样点已迁到 V2 紧凑布局底部透底区，保留原有阈值；同提交 CI 与 DMG 包校验结果见交付报告；main 未改动 |
+| I-044 | v0.3.9 V2 实测缺口收尾 | 补齐「UI设计」V2 实测发现的窄窗设置、保存反馈、会议快速新增与 55% 可读性缺口，并纠正当前稳定基线 | 340×520 四档字体下设置面板改为相对视口定位并限制在窗口内；隐藏 ICS 文件输入移出 Tab 顺序；新增成功以现有 toast/aria-live 给出目标日期，新建项静态高亮并滚动到清单顶部而不抢焦点、不改编辑/日期/筛选；会议初始类型直接展开开始/结束/提前提醒并保留默认值；55% 外壳仍按档位可透，顶栏与日期/分类头使用小面积不透明表面，日历、清单和浮层表面保持不透明；README/PRD 当前 main 稳定基线由 0.3.6 纠正为 0.3.8，历史记录不改写；不增加依赖、不改版本/CI/审计策略、不操作用户数据 | FR-009、FR-035、FR-036、FR-039 | dev 已完成（2026-11-18）：141 项前端测试通过，核心 `src/lib` statements/lines 100%（branches 96.69%、functions 100%）；`npm run check`、`npm run verify:version` 通过；真实 Chromium 对 340×520/360×620/900×640 的键盘开合、焦点归还、完成原位/滚动位置与撤销执行 62 项检查且零失败；340×520 四档字体设置面板 x=56、right=330、font4 bottom=485，内容无内部裁切；隐藏文件输入 tabIndex=-1；55% 外壳 alpha 0.55、顶栏/日期头/日历/清单表面 alpha 1，表头次要文字对比度 6.13:1，100% 外壳 alpha 1；证据输出 ignored `output/ui-v2-polish/`；main 未改动 |
 
 ### Document Revision History
 
@@ -478,6 +479,7 @@ Acceptance Criteria:
 | v1.0-r16 | 2026-11-17 | v0.3.7 | 记录日期格悬停/键盘 border beam、减少动态静态回退，以及透明度背景层合成和拖动/失焦清理迭代；补充 FR-032/FR-033、I-041 与 dev/main 版本基线，main 稳定版保持 v0.3.6 |
 | v1.0-r17 | 2026-11-17 | v0.3.8 | 记录透明背景根因修复：100% 主元素真正不透明、首帧同步设置、低档稳定可透；新增 FR-034 与 I-042，补充真实 WKWebView 双背景像素回归及激活环境边界，main 稳定版保持 v0.3.6 |
 | v1.0-r18 | 2026-11-18 | v0.3.9 | 按 V2 五页设计重做组合布局、配色、组件层级与交互；取消日历光束，新增快速新增浮层、日期键盘导航、待处理计数、完成撤销与不透明内容面规范；新增 US-23、FR-035～FR-039、I-043，撤销 FR-032，补充新版验收规则；main 稳定版保持 v0.3.6 |
+| v1.0-r19 | 2026-11-18 | v0.3.9 | 收尾 V2 实测缺口：窄窗设置面板视口内定位、隐藏文件输入移出 Tab、保存日期反馈与新建项静态定位、会议快速新增直接展示可编辑时间、55% 顶栏与日期/分类头不透明承载面；当前 main 稳定基线纠正为 v0.3.8，新增 I-044，历史记录保留 |
 
 ### Requirement Traceability Rules
 
@@ -548,7 +550,7 @@ v1.0 需要增加或标准化：
 
 | 平台 | 支持范围 | 安装格式 | 当前状态 | 发布要求 |
 |---|---|---|---|---|
-| macOS | Apple Silicon；Intel 策略待确认 | DMG | main v0.3.6 / dev v0.3.9，已收敛为 macOS-only | Developer ID 签名、公证、Gatekeeper、多机验证 |
+| macOS | Apple Silicon；Intel 策略待确认 | DMG | main v0.3.8 / dev v0.3.9，已收敛为 macOS-only | Developer ID 签名、公证、Gatekeeper、多机验证 |
 
 ### Security & Privacy
 
@@ -575,7 +577,7 @@ v1.0 需要增加或标准化：
 
 ### Test Strategy
 
-当前 dev v0.3.9 / main v0.3.6 基线执行前端自动化、`src/lib` 核心逻辑覆盖率门禁（statements/lines ≥ 90%）、Rust 和 Swift 语法检查、真实 WKWebView 透明度像素回归。全项目覆盖率不作为 90% 门禁，PRD 的 90% 成功标准仅针对核心领域逻辑；实际全项目数值必须在测试证据中如实记录。v1.0 测试矩阵必须包括：
+当前 dev v0.3.9 / main v0.3.8 基线执行前端自动化、`src/lib` 核心逻辑覆盖率门禁（statements/lines ≥ 90%）、Rust 和 Swift 语法检查、真实 WKWebView 透明度像素回归。全项目覆盖率不作为 90% 门禁，PRD 的 90% 成功标准仅针对核心领域逻辑；实际全项目数值必须在测试证据中如实记录。v1.0 测试矩阵必须包括：
 
 1. **单元测试**：日期、周起始、排序、筛选、重复规则、提醒去重、迁移和字段校验。
 2. **组件测试**：任务/会议新增与编辑、滚动、50/50 布局、透明度首帧与低档可透、错误和空状态。

@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { addDays, format, getISODay } from "date-fns";
+import { addDays, format, getISODay, parseISO } from "date-fns";
 import App from "./App";
 import { scopedStorageKey } from "./lib/scopedStorage";
 import { dateKey, weekDays } from "./lib/calendar";
@@ -144,6 +144,80 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "新增事项" }));
     expect(screen.queryByRole("dialog", { name: "更多设置" })).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "新建事项" })).toBeInTheDocument();
+  });
+
+  it("设置栏可用 Tab 进入、Esc 关闭并把焦点归还设置按钮", async () => {
+    const user = userEvent.setup(); render(<App/>);
+    const settings = screen.getByRole("button", { name: "设置" });
+    await user.click(settings);
+    expect(screen.getByRole("dialog", { name: "更多设置" })).toBeInTheDocument();
+
+    await user.tab();
+    expect(screen.getByRole("checkbox", { name: /桌面小组件/ })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("checkbox", { name: /锁定位置/ })).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "更多设置" })).not.toBeInTheDocument();
+    await waitFor(() => expect(settings).toHaveFocus());
+    expect(document.querySelector('input[type="file"]')).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("只填标题新增后显示目标日期反馈并静态定位新事项", async () => {
+    const user = userEvent.setup(); render(<App/>);
+    const newButton = screen.getByRole("button", { name: "新增事项" });
+    await user.click(newButton);
+    await user.type(screen.getByLabelText("标题"), "带日期反馈的新事项");
+    await user.click(screen.getByRole("button", { name: "保存任务" }));
+
+    const title = await screen.findByText("带日期反馈的新事项");
+    expect(screen.getByText(`已添加到${format(new Date(), "M月d日")}`)).toBeInTheDocument();
+    await waitFor(() => expect(title.closest(".item-row")).toHaveClass("just-created"));
+    expect(screen.getByRole("button", { name: /全部/ })).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => expect(newButton).toHaveFocus());
+  });
+
+  it("换日期创建保留当前日期和筛选，并按新日期反馈", async () => {
+    const user = userEvent.setup(); const { container } = render(<App/>);
+    const today = new Date();
+    const target = addDays(today, 2);
+    await user.click(screen.getByRole("button", { name: "新增事项" }));
+    fireEvent.change(screen.getByLabelText("日期"), { target: { value: format(target, "yyyy-MM-dd") } });
+    await user.type(screen.getByLabelText("标题"), "换日创建的事项");
+    await user.click(screen.getByRole("button", { name: "保存任务" }));
+
+    expect(await screen.findByText(`已添加到${format(target, "M月d日")}`)).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: `${format(today, "M月d日")}待办列表` })).toBeInTheDocument();
+    expect(screen.queryByText("换日创建的事项")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "月" }));
+    const targetCell = dayCell(container, target);
+    if (!targetCell) throw new Error("target date cell missing");
+    fireEvent.click(targetCell);
+    expect(await screen.findByText("换日创建的事项")).toBeInTheDocument();
+  });
+
+  it("会议筛选下快速新增直接显示默认时间并保留筛选", async () => {
+    const user = userEvent.setup(); render(<App/>);
+    const meetingFilter = screen.getByRole("button", { name: /会议/ });
+    await user.click(meetingFilter);
+    await user.click(screen.getByRole("button", { name: "新增事项" }));
+
+    expect(screen.getByLabelText("开始时间")).toHaveValue("09:30");
+    expect(screen.getByLabelText("结束时间")).toHaveValue("10:00");
+    expect(screen.getByLabelText("提前提醒")).toHaveValue("15");
+    expect(screen.getByText("已展开，可直接编辑")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("开始时间"), { target: { value: "11:05" } });
+    fireEvent.change(screen.getByLabelText("结束时间"), { target: { value: "11:50" } });
+    await user.type(screen.getByLabelText("标题"), "会议筛选下新增");
+    await user.click(screen.getByRole("button", { name: "保存会议" }));
+
+    expect(await screen.findByText("会议筛选下新增")).toBeInTheDocument();
+    expect(screen.getByText(`已添加到${format(new Date(), "M月d日")}`)).toBeInTheDocument();
+    expect(meetingFilter).toHaveAttribute("aria-pressed", "true");
+    expect(storedItems().find((item) => item.title === "会议筛选下新增")).toMatchObject({ type: "meeting", startAt: expect.any(String), endAt: expect.any(String) });
+    expect(format(parseISO(storedItems().find((item) => item.title === "会议筛选下新增")?.startAt ?? ""), "HH:mm")).toBe("11:05");
   });
 
   it("每周任务按日期独立保存完成状态", async () => {

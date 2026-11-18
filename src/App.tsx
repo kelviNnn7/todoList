@@ -84,6 +84,7 @@ export default function App() {
   const [toast, setToast] = useState<{ message: string; kind: ToastKind } | null>(null);
   const [undo, setUndo] = useState<UndoRecord | null>(null);
   const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
+  const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
   const importInput = useRef<HTMLInputElement>(null);
   const menuContainer = useRef<HTMLSpanElement>(null);
   const settingsButton = useRef<HTMLButtonElement>(null);
@@ -422,6 +423,25 @@ export default function App() {
   const groups = useMemo(() => groupAgendaItems(visible), [visible]);
   const compactItems = useMemo(() => [...groups.allDay, ...groups.timed], [groups]);
 
+  useEffect(() => {
+    if (!highlightedItemId) return;
+    const timer = window.setTimeout(() => setHighlightedItemId(null), 2600);
+    return () => window.clearTimeout(timer);
+  }, [highlightedItemId]);
+  useEffect(() => {
+    if (!highlightedItemId) return;
+    const element = list.current;
+    if (!element) return;
+    // Only a newly added row changes the item count; completing a row must not re-scroll the list.
+    const row = [...element.querySelectorAll<HTMLElement>("[data-item-id]")].find((value) => value.dataset.itemId === highlightedItemId);
+    if (!row) return;
+    row.classList.add("just-created");
+    const listRect = element.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    element.scrollTop = Math.max(0, element.scrollTop + rowRect.top - listRect.top - 4);
+    return () => row.classList.remove("just-created");
+  }, [highlightedItemId, items.length]);
+
   function openCreate(type: ItemType, trigger?: HTMLElement | null) {
     setMenuOpen(false);
     setFormAnchor(trigger ?? newButton.current);
@@ -584,7 +604,7 @@ export default function App() {
           onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openModality.current = "keyboard"; }}
           onClick={(event) => openCreate(filter === "meeting" ? "meeting" : "task", event.currentTarget)}
         ><Plus size={17}/><span className="new-label-full">新建事项</span><span className="new-label-compact">新建</span></button>
-        <input ref={importInput} className="visually-hidden" type="file" accept=".ics,text/calendar" onChange={(event) => void importIcsFile(event.target.files?.[0])}/>
+        <input ref={importInput} className="visually-hidden" type="file" accept=".ics,text/calendar" tabIndex={-1} onChange={(event) => void importIcsFile(event.target.files?.[0])}/>
       </div>
     </header>
     <div className="workspace">
@@ -630,15 +650,17 @@ export default function App() {
         <div className="calendar-legend"><span><i className="dot pending" aria-hidden="true"/>有待处理事项</span><span><i className="dot overdue" aria-hidden="true"/>有逾期</span><span className="visually-hidden">角标包含未完成待办与尚未开始的会议，逾期以琥珀色和文字提示同时表达。</span></div>
       </section>
       <section className="agenda">
-        <header className="agenda-heading">
-          <div className="agenda-title"><span className="eyebrow">{format(selectedDate, "EEEE", { locale: zhCN })}</span><h2>{isToday(selectedDate) ? `今天 · ${format(selectedDate, "M月d日")}` : format(selectedDate, "M月d日")}</h2></div>
-          <span className="pending-count" aria-live="polite">{counts[filter]} 项待处理</span>
-        </header>
-        <nav className="filters" aria-label="事项筛选">
-          <button className={filter === "all" ? "active" : ""} aria-pressed={filter === "all"} onClick={() => setFilter("all")}>全部<span>{counts.all}</span></button>
-          <button className={filter === "task" ? "active" : ""} aria-pressed={filter === "task"} onClick={() => setFilter("task")}>工作清单<span>{counts.task}</span></button>
-          <button className={filter === "meeting" ? "active" : ""} aria-pressed={filter === "meeting"} onClick={() => setFilter("meeting")}>会议<span>{counts.meeting}</span></button>
-        </nav>
+        <div className="agenda-header">
+          <header className="agenda-heading">
+            <div className="agenda-title"><span className="eyebrow">{format(selectedDate, "EEEE", { locale: zhCN })}</span><h2>{isToday(selectedDate) ? `今天 · ${format(selectedDate, "M月d日")}` : format(selectedDate, "M月d日")}</h2></div>
+            <span className="pending-count" aria-live="polite">{counts[filter]} 项待处理</span>
+          </header>
+          <nav className="filters" aria-label="事项筛选">
+            <button className={filter === "all" ? "active" : ""} aria-pressed={filter === "all"} onClick={() => setFilter("all")}>全部<span>{counts.all}</span></button>
+            <button className={filter === "task" ? "active" : ""} aria-pressed={filter === "task"} onClick={() => setFilter("task")}>工作清单<span>{counts.task}</span></button>
+            <button className={filter === "meeting" ? "active" : ""} aria-pressed={filter === "meeting"} onClick={() => setFilter("meeting")}>会议<span>{counts.meeting}</span></button>
+          </nav>
+        </div>
         <div ref={list} className="agenda-body" role="region" aria-label={`${format(selectedDate, "M月d日")}待办列表`} tabIndex={0} onScroll={() => { listScroll.current = list.current?.scrollTop ?? 0; }}>
           {loading ? <div className="empty-state"><strong>正在加载本地数据…</strong></div> : visible.length ? (
             expandedWindow
@@ -652,11 +674,17 @@ export default function App() {
       </section>
     </div>
     {formType && <ItemForm key={editingItem?.id ?? `new-${formType}`} date={selectedDate} initialType={formType} initialItem={editingItem ?? undefined} anchor={formAnchor} openModality={formModality} onClose={() => closeForm(true)} onSave={async (item) => {
+      const creating = !editingItem;
       try {
         await persist(item);
       } catch {
         notify("保存失败，请重试", "error");
         throw new Error("保存失败，请重试");
+      }
+      if (creating) {
+        const savedDate = itemDate(item) ?? selectedDate;
+        setHighlightedItemId(item.id);
+        notify(`已添加到${format(savedDate, "M月d日")}`, "success");
       }
     }}/>}
     {toast && <div className={`toast ${toast.kind}`} role={toast.kind === "error" ? "alert" : "status"} aria-live={toast.kind === "error" ? "assertive" : "polite"}>
