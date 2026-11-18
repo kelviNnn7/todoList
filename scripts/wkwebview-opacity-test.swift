@@ -102,7 +102,7 @@ func diff(_ lhs: PixelImage, _ rhs: PixelImage) -> ImageDiff {
 }
 
 let shellBackgroundPoints: [(Double, Double)] = [
-    (0.017, 0.25), (0.017, 0.50), (0.017, 0.75), (0.983, 0.25), (0.983, 0.75),
+    (0.0278, 0.25), (0.0278, 0.50), (0.0278, 0.75), (0.9722, 0.25), (0.9722, 0.75),
 ]
 // Opaque topbar surface, used to measure the snapshot pipeline's global color
 // bias between the two backdrop runs. It never takes the shell's opacity.
@@ -112,9 +112,9 @@ func backgroundDiff(_ lhs: PixelImage, _ rhs: PixelImage, points: [(Double, Doub
     guard lhs.width == rhs.width, lhs.height == rhs.height else {
         return ImageDiff(mean: .infinity, maxChannel: 255, changedFraction: 1)
     }
-    // Fixed patches in the shell's left/right padding. These never contain text,
-    // controls, or the transparent workspace/resize layers, so the comparison
-    // isolates the shell material itself even when content timing differs.
+    // Fixed 5x5 patches in the 6pt shell padding strip between the resize
+    // handles and the transparent workspace. Sampling outside those layers
+    // isolates the shell material itself; the strip is too narrow for 7x7.
     var total = 0.0
     var maxChannel = 0
     var changed = 0
@@ -122,8 +122,8 @@ func backgroundDiff(_ lhs: PixelImage, _ rhs: PixelImage, points: [(Double, Doub
     for (nx, ny) in points {
         let centerX = Int(Double(lhs.width) * nx)
         let centerY = Int(Double(lhs.height) * ny)
-        for dy in -3...3 {
-            for dx in -3...3 {
+        for dy in -2...2 {
+            for dx in -2...2 {
                 let x = centerX + dx
                 let y = centerY + dy
                 guard x >= 0, y >= 0, x < lhs.width, y < lhs.height else { continue }
