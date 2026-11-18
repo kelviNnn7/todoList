@@ -78,6 +78,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   flex-direction: column;
   gap: 10px;
 }
+.app-shell.opaque { background-color: rgb(var(--shell-bottom)); }
 .app-shell.expanded { padding: 20px 22px 18px; border-radius: 24px; gap: 16px; }
 .app-shell.dragging { cursor: grabbing; }
 .drag-region { position: absolute; z-index: 2; top: 0; left: 48px; right: 48px; height: 13px; cursor: grab; }

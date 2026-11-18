@@ -42,6 +42,7 @@ describe("v0.3.9 V2 interaction contract", () => {
     expect(source).toMatch(/\.item-group\s*\{[^}]*background: var\(--surface\)/);
     expect(source).toMatch(/\.calendar-panel\s*\{[^}]*background: var\(--surface\)/);
     expect(source).toContain("background-image: linear-gradient(145deg, rgb(var(--shell-top) / var(--widget-opacity");
+    expect(source).toMatch(/\.app-shell\.opaque\s*\{[^}]*background-color: rgb\(var\(--shell-bottom\)\)/);
   });
 
   it("窄窗设置面板相对视口定位并保留窗口内宽度", () => {

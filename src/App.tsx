@@ -570,7 +570,7 @@ export default function App() {
     onEdit={(value, trigger) => openEdit(value, trigger)}
   />;
 
-  return <main className={`app-shell ${expandedWindow ? "expanded" : "compact"} ${desktopWidget ? "desktop-widget" : ""} ${locked ? "position-locked" : ""} ${dragging ? "dragging" : ""}`} style={{ "--widget-opacity": appearanceOpacity / 100, "--font-scale": fontScale[appearanceFontLevel] } as React.CSSProperties}>
+  return <main className={`app-shell ${expandedWindow ? "expanded" : "compact"} ${appearanceOpacity === 100 ? "opaque" : ""} ${desktopWidget ? "desktop-widget" : ""} ${locked ? "position-locked" : ""} ${dragging ? "dragging" : ""}`} style={{ "--widget-opacity": appearanceOpacity / 100, "--font-scale": fontScale[appearanceFontLevel] } as React.CSSProperties}>
     {resizeDirections.map((direction) => <div key={direction} className={`window-resize-handle resize-${direction.toLowerCase()}`} aria-hidden="true" onPointerDown={(event) => startWindowResize(direction, event)}/>)}
     <div className="drag-region" onMouseDown={startWindowDrag}/>
     <header className="topbar" onMouseDown={startWindowDrag}>
