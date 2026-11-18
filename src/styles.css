@@ -29,6 +29,11 @@
   --surface-pressed: rgba(36, 72, 190, .09);
   --control-fill: rgba(255, 255, 255, .055);
   --control-active: rgba(255, 255, 255, .07);
+  --selection-fill: rgba(36, 72, 190, .06);
+  --selection-fill-strong: rgba(36, 72, 190, .07);
+  --selection-edge: rgba(36, 72, 190, .72);
+  --selection-ink: #17306f;
+  --selection-badge: rgba(36, 72, 190, .16);
   --panel-border: rgba(23, 29, 41, .11);
   --separator: rgba(23, 29, 41, .08);
   --separator-strong: rgba(23, 29, 41, .17);
@@ -69,7 +74,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
  *
  * `background-clip: padding-box` keeps the window border off the gradient so
  * the border alpha is not multiplied by the shell alpha. All visible content
- * surfaces below are transparent (or use a <= 6% state tint); they never repeat
+ * surfaces below are transparent (or use a <= 7.5% state tint); they never repeat
  * the material alpha. At 100% the `.opaque` class switches to a deterministic
  * solid surface instead of a gradient, so the first content frame is exactly
  * opaque in WKWebView.
@@ -90,7 +95,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   flex-direction: column;
   gap: 10px;
 }
-.app-shell.opaque { background-color: rgb(var(--shell-bottom)); background-image: none; }
+.app-shell.opaque { background-color: rgb(var(--shell-bottom)); background-image: none; border-color: rgb(var(--shell-border-rgb)); }
 .app-shell.expanded { padding: 20px 22px 18px; border-radius: 24px; gap: 16px; }
 .app-shell.dragging { cursor: grabbing; }
 .drag-region { position: absolute; z-index: 2; top: 0; left: 48px; right: 48px; height: 13px; cursor: grab; }
@@ -256,7 +261,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .day-beam { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .day-beam rect { fill: none; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .day-beam-static { stroke: rgba(34, 211, 238, .3); }
-.day-beam-trace { stroke: url(#day-beam-gradient); stroke-dasharray: 100; stroke-dashoffset: 100; opacity: 0; }
+.day-beam-trace { stroke: url(#day-beam-gradient); stroke-dasharray: 16 84; stroke-dashoffset: 0; opacity: 0; }
 .day-cell.beam-active .day-beam-trace {
   animation-name: calendar-beam-trace;
   animation-duration: 900ms;
@@ -266,7 +271,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   will-change: stroke-dashoffset, opacity;
 }
 @media (prefers-reduced-motion: reduce) {
-  .day-cell.beam-active .day-beam-trace { animation: none; opacity: .62; stroke-dashoffset: 0; }
+  .day-cell.beam-active .day-beam-trace { animation: none; opacity: 0; stroke-dashoffset: 0; }
   .day-beam-static { stroke: rgba(34, 211, 238, .5); }
 }
 .calendar-legend { display: flex; align-items: center; gap: 11px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--separator); color: var(--text-muted); font-size: calc(9px * var(--font-scale)); line-height: 1.3; }
@@ -467,10 +472,45 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .check:active { transition-duration: 120ms; }
 .app-menu button:active, .menu-setting:active, .more-toggle:active, .edit-link:active, .danger-link:active { opacity: .72; }
 
+/*
+ * Below 100% the shell stays the only material layer. Filled states add at
+ * most a 7.5% hue tint so the backdrop still contributes 37–43% of the
+ * black/white channel difference, then recover contrast with an accent edge
+ * and accent-toned ink. The saturated white-on-accent treatment is kept for
+ * the `.opaque` 100% class.
+ */
+.app-shell:not(.opaque) .add-button,
+.app-shell:not(.opaque) .button.primary,
+.app-shell:not(.opaque) .check[aria-pressed="true"],
+.app-shell:not(.opaque) .weekday-picker button.active {
+  color: var(--selection-ink);
+  background: var(--selection-fill);
+}
+.app-shell:not(.opaque) .add-button { box-shadow: inset 0 0 0 1px var(--selection-edge); }
+.app-shell:not(.opaque) .button.primary { border-color: var(--selection-edge); box-shadow: none; }
+.app-shell:not(.opaque) .check[aria-pressed="true"],
+.app-shell:not(.opaque) .weekday-picker button.active { border-color: var(--selection-edge); }
+.app-shell:not(.opaque) .day-cell.selected {
+  color: var(--selection-ink);
+  background: var(--selection-fill);
+  box-shadow: inset 0 0 0 1.5px var(--selection-edge), 0 2px 6px rgba(36, 72, 190, .12);
+}
+.app-shell:not(.opaque) .day-cell.selected .day-number,
+.app-shell:not(.opaque) .day-cell.selected .day-weekday { color: var(--selection-ink); }
+.app-shell:not(.opaque) .day-cell.selected .day-count,
+.app-shell:not(.opaque) .day-cell.selected .day-count.overdue { color: var(--selection-ink); background: var(--selection-badge); }
+.app-shell:not(.opaque) .day-cell.selected .dot { background: var(--selection-edge); }
+.app-shell:not(.opaque) .day-cell.selected .dot.overdue { background: var(--overdue); }
+.app-shell:not(.opaque) .menu-setting input:checked + i { background: var(--selection-fill-strong); box-shadow: inset 0 0 0 1px var(--selection-edge); }
+@media (hover: hover) and (pointer: fine) {
+  .app-shell:not(.opaque) .add-button:hover,
+  .app-shell:not(.opaque) .button.primary:hover { background: var(--selection-fill-strong); }
+}
+
 @keyframes calendar-beam-trace {
-  0% { stroke-dashoffset: 100; opacity: 1; }
-  86% { stroke-dashoffset: 0; opacity: 1; }
-  100% { stroke-dashoffset: 0; opacity: .34; }
+  0% { stroke-dashoffset: 0; opacity: 1; }
+  90% { stroke-dashoffset: -90; opacity: 1; }
+  100% { stroke-dashoffset: -100; opacity: 0; }
 }
 @keyframes menu-in { from { opacity: 0; transform: translateY(-3px) scale(.98); } }
 @keyframes toast-in { from { opacity: 0; transform: translate(-50%, 4px); } }
@@ -496,6 +536,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
     --surface-pressed: rgba(143, 178, 255, .13);
     --control-fill: rgba(255, 255, 255, .055);
     --control-active: rgba(255, 255, 255, .07);
+    --selection-fill: rgba(124, 164, 255, .07);
+    --selection-fill-strong: rgba(143, 178, 255, .07);
+    --selection-edge: rgba(143, 178, 255, .72);
+    --selection-ink: #f5f8fd;
+    --selection-badge: rgba(0, 0, 0, .28);
     --panel-border: rgba(255, 255, 255, .14);
     --separator: rgba(255, 255, 255, .1);
     --separator-strong: rgba(255, 255, 255, .2);

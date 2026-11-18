@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { addDays, addMonths, format, isSameDay, isSameMonth, isToday } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { Check, ChevronLeft, ChevronRight, Expand, Minimize2, Plus, SlidersHorizontal } from "lucide-react";
@@ -89,6 +89,7 @@ export default function App() {
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
   const importInput = useRef<HTMLInputElement>(null);
   const menuContainer = useRef<HTMLSpanElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const settingsButton = useRef<HTMLButtonElement>(null);
   const newButton = useRef<HTMLButtonElement>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -294,13 +295,29 @@ export default function App() {
   }, [menuOpen]);
   useEffect(() => {
     if (!menuOpen) return;
+    // The menu shares the shell material; tabbing must not land on background
+    // text that the overlay marked transparent. Keep focus inside the dialog.
+    const focusable = () => [...(menuRef.current?.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href]") ?? [])];
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       setMenuOpen(false);
       settingsButton.current?.focus();
     };
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key !== "Tab") return;
+      const items = focusable();
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === settingsButton.current)) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); settingsButton.current?.focus(); }
+    };
     window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
+    window.addEventListener("keydown", trapFocus);
+    return () => {
+      window.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("keydown", trapFocus);
+    };
   }, [menuOpen]);
   useEffect(() => {
     const endDrag = () => endWindowDrag();
@@ -340,7 +357,7 @@ export default function App() {
       document.removeEventListener("visibilitychange", clearWhenHidden);
     };
   }, []);
-  useEffect(() => {
+  useLayoutEffect(() => {
     // The popover shares the shell material instead of stacking a second alpha
     // layer. Only text nodes intersecting its footprint are temporarily
     // transparent; layout, scroll position, focus order and the accessibility
@@ -350,55 +367,58 @@ export default function App() {
       return;
     }
     let frame = 0;
-    const update = () => {
-      if (frame) cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        const overlay = document.querySelector<HTMLElement>(".item-form, .app-menu");
-        if (!overlay) return;
-        const box = overlay.getBoundingClientRect();
-        const pad = 6;
-        const left = box.left - pad;
-        const top = box.top - pad;
-        const right = box.right + pad;
-        const bottom = box.bottom + pad;
-        const marked = new Set<HTMLElement>();
-        const intersects = (rect: DOMRect) => rect.width > 0 && rect.height > 0 && rect.right > left && rect.left < right && rect.bottom > top && rect.top < bottom;
-        const roots = [document.querySelector<HTMLElement>(".topbar"), document.querySelector<HTMLElement>(".workspace")].filter((root): root is HTMLElement => Boolean(root));
-        for (const root of roots) {
-          const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-          let node = walker.nextNode();
-          while (node) {
-            if (node.textContent?.trim()) {
-              const parent = node.parentElement;
-              if (parent && !parent.closest(".app-menu, .popover-layer") && intersects(parent.getBoundingClientRect())) marked.add(parent);
-            }
-            node = walker.nextNode();
+    const apply = () => {
+      const overlay = document.querySelector<HTMLElement>(".item-form, .app-menu");
+      if (!overlay) return;
+      const box = overlay.getBoundingClientRect();
+      const pad = 6;
+      const left = box.left - pad;
+      const top = box.top - pad;
+      const right = box.right + pad;
+      const bottom = box.bottom + pad;
+      const marked = new Set<HTMLElement>();
+      const intersects = (rect: DOMRect) => rect.width > 0 && rect.height > 0 && rect.right > left && rect.left < right && rect.bottom > top && rect.top < bottom;
+      const roots = [document.querySelector<HTMLElement>(".topbar"), document.querySelector<HTMLElement>(".workspace")].filter((root): root is HTMLElement => Boolean(root));
+      for (const root of roots) {
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        let node = walker.nextNode();
+        while (node) {
+          if (node.textContent?.trim()) {
+            const parent = node.parentElement;
+            if (parent && !parent.closest(".app-menu, .popover-layer, .menu-container") && intersects(parent.getBoundingClientRect())) marked.add(parent);
           }
-          for (const element of root.querySelectorAll<HTMLElement>("button, a, input, textarea, select, img, svg")) {
-            if (!element.closest(".app-menu, .popover-layer") && intersects(element.getBoundingClientRect())) marked.add(element);
-          }
+          node = walker.nextNode();
         }
-        document.querySelectorAll(".overlay-occluded").forEach((element) => {
-          if (!marked.has(element as HTMLElement)) element.classList.remove("overlay-occluded");
-        });
-        marked.forEach((element) => element.classList.add("overlay-occluded"));
+        for (const element of root.querySelectorAll<HTMLElement>("button, a, input, textarea, select, img, svg")) {
+          if (!element.closest(".app-menu, .popover-layer, .menu-container") && intersects(element.getBoundingClientRect())) marked.add(element);
+        }
+      }
+      document.querySelectorAll(".overlay-occluded").forEach((element) => {
+        if (!marked.has(element as HTMLElement)) element.classList.remove("overlay-occluded");
       });
+      marked.forEach((element) => element.classList.add("overlay-occluded"));
     };
-    update();
+    const schedule = () => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(apply);
+    };
+    // Apply before the first paint of the opening frame, then coalesce any
+    // resize/mutation/scroll updates into the next animation frame.
+    apply();
     const overlay = document.querySelector<HTMLElement>(".item-form, .app-menu");
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
     if (overlay) observer?.observe(overlay);
-    const mutations = overlay && typeof MutationObserver !== "undefined" ? new MutationObserver(update) : null;
+    const mutations = overlay && typeof MutationObserver !== "undefined" ? new MutationObserver(schedule) : null;
     mutations?.observe(overlay!, { attributes: true, attributeFilter: ["style", "data-phase"] });
     const list = document.querySelector<HTMLElement>(".agenda-body");
-    window.addEventListener("resize", update);
-    list?.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", schedule);
+    list?.addEventListener("scroll", schedule, { passive: true });
     return () => {
       if (frame) cancelAnimationFrame(frame);
       observer?.disconnect();
       mutations?.disconnect();
-      window.removeEventListener("resize", update);
-      list?.removeEventListener("scroll", update);
+      window.removeEventListener("resize", schedule);
+      list?.removeEventListener("scroll", schedule);
       document.querySelectorAll(".overlay-occluded").forEach((element) => element.classList.remove("overlay-occluded"));
     };
   }, [formType, menuOpen, selectedDate, filter, expandedWindow, appearanceFontLevel, viewMode]);
@@ -610,7 +630,6 @@ export default function App() {
   }
   const calendarTitle = viewMode === "week" ? `${format(days[0], "M月d日")} — ${format(days[6], "M月d日")}` : format(calendarAnchor, "yyyy年 M月");
   function handleGridKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
-    setBeamTarget(null);
     const key = event.key;
     if (key === "Enter" || key === " ") {
       event.preventDefault();
@@ -621,7 +640,13 @@ export default function App() {
     if (!delta) return;
     event.preventDefault();
     const next = addDays(focusedDate, delta);
-    if (next < days[0] || next > days[days.length - 1]) setCalendarAnchor(next);
+    if (next < days[0] || next > days[days.length - 1]) {
+      // Crossing into another page replaces every cell, so the pointer target
+      // cannot belong to the new view. Same-page arrows and selection keep the
+      // hover beam alive so focus-visible and hover can show together.
+      setBeamTarget(null);
+      setCalendarAnchor(next);
+    }
     pendingFocus.current = dateKey(next);
     setFocusedDate(next);
   }
@@ -672,7 +697,7 @@ export default function App() {
           <button ref={settingsButton} className={`icon-button ${menuOpen ? "pressed" : ""}`} aria-label="设置" title="设置" aria-haspopup="dialog" aria-expanded={menuOpen} onClick={() => { if (!menuOpen) closeForm(false); setMenuOpen((value) => !value); }}>
             <SlidersHorizontal size={17}/>
           </button>
-          {menuOpen && <div className="app-menu" role="dialog" aria-label="更多设置">
+          {menuOpen && <div ref={menuRef} className="app-menu" role="dialog" aria-label="更多设置">
             <span className="menu-title">外观与窗口</span>
             <label className="menu-setting"><span><strong>桌面小组件</strong><small>驻留桌面，不遮挡其他窗口</small></span><input type="checkbox" checked={desktopWidget} onChange={() => void toggleDesktopWidget()}/><i aria-hidden="true"/></label>
             <label className="menu-setting"><span><strong>锁定位置</strong><small>防止意外拖动挂件</small></span><input type="checkbox" checked={locked} onChange={() => void toggleLock()}/><i aria-hidden="true"/></label>

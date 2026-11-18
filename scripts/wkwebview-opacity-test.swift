@@ -457,6 +457,7 @@ final class Probe: NSObject, WKNavigationDelegate {
             currentTime: animation && animation.currentTime != null ? animation.currentTime : "",
             timingDuration: timing ? timing.duration : "",
             dash: style ? style.strokeDashoffset : "",
+            dasharray: style ? style.strokeDasharray : "",
             animation: style ? style.animationName : "",
             duration: style ? style.animationDuration : "",
             opacity: style ? style.opacity : "",
@@ -578,6 +579,8 @@ final class Probe: NSObject, WKNavigationDelegate {
               return {
                 active: document.querySelectorAll(".beam-active").length,
                 dash: style ? style.strokeDashoffset : "",
+                dasharray: style ? style.strokeDasharray : "",
+                opacity: style ? style.opacity : "",
                 animation: style ? style.animationName : "",
                 duration: style ? style.animationDuration : "",
                 timingDuration: timing ? timing.duration : "",
@@ -604,6 +607,7 @@ final class Probe: NSObject, WKNavigationDelegate {
               return {
                 active: document.querySelectorAll(".beam-active").length,
                 dash: style ? style.strokeDashoffset : "",
+                opacity: style ? style.opacity : "",
                 playState: animations.length ? animations[0].playState : ""
               };
             })();
@@ -870,24 +874,24 @@ func runTests(url: URL, outputDirectory: URL) {
                 failures.append("\(item.name)-beam: expected exactly one active cell/beam, got active=\(beam["mid.active"] ?? "nil") beams=\(beam["mid.beams"] ?? "nil")")
             }
             if beam["reduced"] == "true" {
-                if beam["mid.animation"] != "none" || beam["mid.dash"] != "0px" {
-                    failures.append("\(item.name)-beam: reduced-motion static fallback missing: animation=\(beam["mid.animation"] ?? "nil") dash=\(beam["mid.dash"] ?? "nil")")
+                if beam["mid.animation"] != "none" || beam["mid.dash"] != "0px" || beam["mid.opacity"] != "0" {
+                    failures.append("\(item.name)-beam: reduced-motion static ring fallback missing: animation=\(beam["mid.animation"] ?? "nil") dash=\(beam["mid.dash"] ?? "nil") opacity=\(beam["mid.opacity"] ?? "nil")")
                 }
-                if beam["forcedMid.active"] != "1" || beam["forcedMid.animation"] != "calendar-beam-trace" || beam["forcedMid.duration"] != "0.9s" || beam["forcedMid.timingDuration"] != "900" || beam["forcedMid.playState"] != "paused" {
-                    failures.append("\(item.name)-beam: forced animation did not run in WKWebView: \(beam["forcedMid.animation"] ?? "nil") / \(beam["forcedMid.duration"] ?? "nil") / \(beam["forcedMid.playState"] ?? "nil")")
+                if beam["forcedMid.active"] != "1" || beam["forcedMid.animation"] != "calendar-beam-trace" || beam["forcedMid.duration"] != "0.9s" || beam["forcedMid.timingDuration"] != "900" || beam["forcedMid.playState"] != "paused" || beam["forcedMid.dash"] != "-50px" || beam["forcedMid.opacity"] != "1" {
+                    failures.append("\(item.name)-beam: forced segment did not run in WKWebView: \(beam["forcedMid.animation"] ?? "nil") / \(beam["forcedMid.duration"] ?? "nil") / dash=\(beam["forcedMid.dash"] ?? "nil") / opacity=\(beam["forcedMid.opacity"] ?? "nil") / \(beam["forcedMid.playState"] ?? "nil")")
                 }
-                if beam["forcedEnd.active"] != "1" || beam["forcedEnd.dash"] != "0px" || beam["forcedEnd.playState"] != "finished" {
-                    failures.append("\(item.name)-beam: forced 900ms turn did not settle: active=\(beam["forcedEnd.active"] ?? "nil") dash=\(beam["forcedEnd.dash"] ?? "nil") state=\(beam["forcedEnd.playState"] ?? "nil")")
+                if beam["forcedEnd.active"] != "1" || beam["forcedEnd.dash"] != "-100px" || beam["forcedEnd.opacity"] != "0" || beam["forcedEnd.playState"] != "finished" {
+                    failures.append("\(item.name)-beam: forced 900ms turn did not settle to static: active=\(beam["forcedEnd.active"] ?? "nil") dash=\(beam["forcedEnd.dash"] ?? "nil") opacity=\(beam["forcedEnd.opacity"] ?? "nil") state=\(beam["forcedEnd.playState"] ?? "nil")")
                 }
             } else {
                 if beam["mid.animation"] != "calendar-beam-trace" || beam["mid.duration"] != "0.9s" {
                     failures.append("\(item.name)-beam: animation not configured: \(beam["mid.animation"] ?? "nil") / \(beam["mid.duration"] ?? "nil")")
                 }
-                if beam["mid.dash"] == "0px" || beam["mid.dash"] == "100px" || beam["mid.playState"] != "paused" || beam["mid.timingDuration"] != "900" {
-                    failures.append("\(item.name)-beam: trace did not reach the 450ms midpoint: dash=\(beam["mid.dash"] ?? "nil") state=\(beam["mid.playState"] ?? "nil") duration=\(beam["mid.timingDuration"] ?? "nil")")
+                if beam["mid.dash"] != "-50px" || beam["mid.opacity"] != "1" || !(beam["mid.dasharray"] ?? "").contains("16") || beam["mid.playState"] != "paused" || beam["mid.timingDuration"] != "900" {
+                    failures.append("\(item.name)-beam: trace did not reach the 450ms midpoint: dash=\(beam["mid.dash"] ?? "nil") array=\(beam["mid.dasharray"] ?? "nil") opacity=\(beam["mid.opacity"] ?? "nil") state=\(beam["mid.playState"] ?? "nil") duration=\(beam["mid.timingDuration"] ?? "nil")")
                 }
-                if beam["end.active"] != "1" || beam["end.dash"] != "0px" || beam["end.playState"] != "finished" {
-                    failures.append("\(item.name)-beam: 900ms single turn did not settle: active=\(beam["end.active"] ?? "nil") dash=\(beam["end.dash"] ?? "nil") state=\(beam["end.playState"] ?? "nil")")
+                if beam["end.active"] != "1" || beam["end.dash"] != "-100px" || beam["end.opacity"] != "0" || beam["end.playState"] != "finished" {
+                    failures.append("\(item.name)-beam: 900ms single turn left a moving trace: active=\(beam["end.active"] ?? "nil") dash=\(beam["end.dash"] ?? "nil") opacity=\(beam["end.opacity"] ?? "nil") state=\(beam["end.playState"] ?? "nil")")
                 }
             }
             for key in ["keyboard", "scrolled", "switched", "touch"] {
@@ -895,7 +899,7 @@ func runTests(url: URL, outputDirectory: URL) {
                     failures.append("\(item.name)-beam: \(key) did not clear the beam: \(beam["\(key).active"] ?? "nil")")
                 }
             }
-            if beam["fallback.active"] != "1" || !["0", ".62", "0.62"].contains(beam["fallback.traceOpacity"] ?? "") || beam["fallback.ringStroke"] == "none" {
+            if beam["fallback.active"] != "1" || beam["fallback.traceOpacity"] != "0" || beam["fallback.ringStroke"] == "none" {
                 failures.append("\(item.name)-beam: static fallback missing: active=\(beam["fallback.active"] ?? "nil") trace=\(beam["fallback.traceOpacity"] ?? "nil") ring=\(beam["fallback.ringStroke"] ?? "nil")")
             }
         }

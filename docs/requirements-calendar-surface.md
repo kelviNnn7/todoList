@@ -2,12 +2,12 @@
 
 | 项目 | 内容 |
 | --- | --- |
-| 文档版本 | 1.1 |
+| 文档版本 | 1.2 |
 | 更新日期 | 2026-11-18 |
 | 开发基线 | `dev` · 应用 v0.3.10 · 主需求文档 v1.0-r20 |
 | 迭代映射 | I-045。恢复 FR-032 的鼠标悬停光束，修订 FR-039 的材质规则，细化 FR-035 的日期标题字号。FR-033、FR-034 和 FR-037 作为回归要求。 |
 | 目标应用版本 | v0.3.10 |
-| 实施状态 | dev 已实现；Chromium 生产构建与真实 macOS WKWebView 验证通过；主应用 DMG 已生成本地验收包，完整 WidgetKit 包待同 SHA CI |
+| 实施状态 | dev 已实现并完成最终回归；Chromium 生产构建与真实 macOS WKWebView 验证通过；主应用 arm64 DMG 已按最终提交重建并验包；本机无完整 Xcode，Widget 扩展未构建 |
 
 ## 1. 摘要
 
@@ -44,9 +44,9 @@ v0.3.9 将日期悬停改为换底，并给顶栏、日历和日期标题使用�
 
 ### 7.1 日期格边缘光束
 
-- 使用细指针悬停触发。覆盖本月、跨月、今天、已选中的可点击日期格。每次进入新格立即启动，按 **900 ms 单圈**运行。结束停在静态淡描边，移出、切视图、窗口失焦或开始拖动时清除。
+- 使用细指针悬停触发。覆盖本月、跨月、今天、已选中的可点击日期格。每次进入新格立即启动，按 **900 ms 单圈**运行：移动段为 `stroke-dasharray: 16 84` 的短蓝青划段，`stroke-dashoffset` 从 0 线性走到 -100，沿现有圆角扫完整一圈。结束帧移动段透明，只停在静态淡描边，不留移动 trace；移出、切视图、窗口失焦或开始拖动时清除。
 - 光束宽度建议 **1.5 CSS px**，蓝青渐变。沿日期格现有圆角走，不占布局空间。日期文字、计数／圆点在上层，既有选中底色和今天下划线保持可辨。
-- 键盘导航沿用独立 `:focus-visible` 外环。焦点与悬停可同时显示。`prefers-reduced-motion: reduce` 下，悬停从第一帧就用静态描边。触屏不显示粘滞的 hover。
+- 键盘导航沿用独立 `:focus-visible` 外环。焦点与悬停可同时显示，同页方向键与 Enter／空格选择不熄灭悬停光束；只有跨页等确实替换视图时才清除。`prefers-reduced-motion: reduce` 下，悬停从第一帧就用静态描边，移动段保持透明。触屏不显示粘滞的 hover。
 - 前端优先沿用日期按钮，用无事件的伪元素或同等级装饰层绘制。仅悬停格运行过渡或动画。遮罩效果在 WKWebView 不可用时回退为静态描边。点击范围、DOM 焦点和布局尺寸保持既有行为。
 
 ### 7.2 底面与边框统一透明度
@@ -83,7 +83,7 @@ v0.3.9 将日期悬停改为换底，并给顶栏、日历和日期标题使用�
 
 ### 9.1 实现范围
 
-- 日期格：恢复仅鼠标指针触发的 900 ms 单圈蓝青边缘光束，1.5 CSS px SVG 描边，沿现有圆角、不占布局；移动日期时旧格立即清除并重启新格，离开、滚动、切视图、失焦、开始拖动和触摸均清理；键盘 `:focus-visible` 仍为独立外环且不启动光束。`prefers-reduced-motion: reduce` 与动画不可用时使用静态淡描边。
+- 日期格：恢复仅鼠标指针触发的 900 ms 单圈蓝青边缘光束，1.5 CSS px SVG 描边；移动段采用 `stroke-dasharray: 16 84` 的短划，`stroke-dashoffset` 从 0 线性走到 -100，结束帧移动段透明，只保留既有静态淡环，不残留移动 trace。光束沿现有圆角、不占布局；移动日期时旧格立即清除并重启新格，离开、滚动、切视图、失焦、开始拖动和触摸均清理；键盘 `:focus-visible` 为独立外环，可与指针悬停同时显示，键盘本身不启动光束；同页方向键/选择不熄灭悬停，只有跨页等确实换视图时清除。`prefers-reduced-motion: reduce` 与动画不可用时直接显示静态淡描边（移动段 opacity 0）。
 - 材质：外壳是唯一可见材质层，按用户 alpha 一次合成；顶栏、日历、日程头/筛选、清单/事项卡、空态、设置、新增/编辑浮层和控件面改为透明或极低 alpha 状态填充，避免 60% 外壳再叠 60% 面板。100% 使用确定性实色；55/60/75/95 按档透底；系统“降低透明度”强制不透但保留用户档位。
 - 浮层：与浮层矩形相交的正文节点临时移除文字填充及装饰底色，不改变布局、位置、滚动或无障碍焦点，不铺全屏遮罩；浮层自身仍使用同一材质。
 - 标题：紧凑 360 px 18 px、窄窗 340 px 17 px、展开 22 px，字重 660、行高 1.25，乘现有四档字号；默认计数同排，340 × 520 最大字号时降到标题下方，标题/计数不省略，清单保持滚动。
@@ -94,7 +94,7 @@ v0.3.9 将日期悬停改为换底，并给顶栏、日历和日期标题使用�
 ```bash
 npm run check
 npm run verify:version
-npm run test:webkit -- output/ui-calendar-surface/wkwebview
+npm run test:webkit -- output/ui-calendar-surface/wkwebview-final
 cargo fmt --manifest-path src-tauri/Cargo.toml --check
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
@@ -104,23 +104,25 @@ OPACITY=55 node output/ui-calendar-surface/contrast.cjs
 node output/ui-calendar-surface/contrast-overdue.cjs
 ```
 
-Chromium 证据位于 ignored `output/ui-calendar-surface/`，包括紧凑/展开、340/360/900、四档字号、浅深主题、55/60/75/95/100、浮层、菜单、光束中段/结束、减少动态和降级截图；机器可读结果见 `verification.json`、`contrast-60.json`、`contrast-55.json`、`contrast-overdue.json`。WKWebView 证据位于 `output/ui-calendar-surface/wkwebview/`，运行结果见 `wkwebview-opacity.json`。
+Chromium 证据位于 ignored `output/ui-calendar-surface/`，包括紧凑/展开、340/360/900、四档字号、浅深主题、55/60/75/95/100、浮层、菜单、短光束中段/结束、键盘焦点与悬停同显、减少动态和降级截图；机器可读结果见 `verification.json`、`final-pixels.json`、`contrast-60.json`、`contrast-55.json`、`contrast-overdue.json`。WKWebView 证据位于 `output/ui-calendar-surface/wkwebview-final/`，运行结果见 `wkwebview-opacity.json`。
 
 ### 9.3 测量结果
 
-- 前端：148 项测试 / 16 个测试文件通过；核心 `src/lib` statements/lines 100%、branches 96.69%、functions 100%；Rust fmt/clippy 与 5 项测试通过。
-- Chromium：`verify-calendar-surface.cjs` 通过 89 项检查、0 失败、15 张截图；覆盖 340 × 520 / 360 × 620 / 900 × 640、四档字号、浅深主题、55/60/75/95/100、浮层无布局位移、光束单格/移动/滚动/切视图/失焦/触摸/减少动态/动画不可用降级，以及黑白背景 alpha。
+- 前端：152 项测试 / 16 个测试文件通过；核心 `src/lib` statements/lines 100%、branches 96.69%、functions 100%；Rust fmt/clippy 与 5 项测试通过；`npm run verify:version` 通过。
+- Chromium：`verify-calendar-surface.cjs` 通过 99 项检查、0 失败、24 张截图；覆盖 340 × 520 / 360 × 620 / 900 × 640、四档字号、浅深主题、55/60/75/95/100、浮层无布局位移、短光束单格/移动/滚动/切视图/失焦/触摸/减少动态/动画不可用降级、键盘焦点与悬停同显，以及黑白背景 alpha。
+- 最终像素 A/B：浅色 60% 选中日期与新增按钮的黑白背景通道差均为 96/255（背景贡献 37.6%），深色 60% 均为 94.67/255（37.1%）；浅深 100% 均为 0。两项控件、两种主题、两档透明度全部落在 60% 贡献 37%–43%、100% 无透底的目标内，证据 `final-pixels.json`。
 - 原生 WKWebView：60% 时外壳、顶栏、日历、日程头、事项卡和窗口描边的纯黑/纯白通道差均为 102/255；55% 为 115，75% 为 64，95% 为 13，100% 为 0。深色 60% 的日历/顶栏/外壳/事项卡/窗口描边为 102，日程头 100.6（仍在 ±3 个百分点内）；1 px 面板分隔线约 94/92，属于装饰分隔线而非材质面。100% 首次绘制、ready、blur/focus、dragging、恢复显示均无背景泄漏。
-- WKWebView 动效：光束 CSS 动画名为 `calendar-beam-trace`、时长 0.9 s、时间轴时长 900 ms；450 ms 时 `stroke-dashoffset` 41.86 px，900 ms 后为 0、透明度 0.34、状态 `finished`；键盘/滚动/切视图/触摸均清除，移除动画后保留静态描边。测试环境 `prefers-reduced-motion` 为 false；Chromium 减少动态分支验证静态描边为 `animation: none`、`stroke-dashoffset: 0`、透明度 0.62。
-- 对比度：在 55%/60% 与浅/深壁纸实际渲染取样，正文/小字/选中/按钮最低约 4.62:1（55% 浅色小字），60% 最低约 5.05:1；深色最低 5.25:1（选中日期/主按钮）；焦点环 8.16:1（55% 浅色）、11.25:1（55% 深色）；逾期文字 4.77:1（浅色）、11.96:1（深色），非选中逾期角标 5.88:1。均达到 ≥ 4.5:1 与焦点 ≥ 3:1 目标。
+- WKWebView 动效：光束 CSS 动画名为 `calendar-beam-trace`、时长 0.9 s、时间轴时长 900 ms；`stroke-dasharray` 为 16px/84px，450 ms 时 `stroke-dashoffset` 为 -50px、透明度 1；900 ms 后为 -100px、透明度 0、状态 `finished`，只保留静态环。键盘/滚动/切视图/触摸均清除；减少动态与移除动画时移动段透明度 0、静态环保留。
+- 对比度：在 55%/60% 与浅/深壁纸实际渲染取样，60% 最低 5.05:1（浅色次要文字）、深色最低 5.25:1（选中日期）；55% 最低 4.62:1（浅色小字）；焦点环 8.16:1（55% 浅色）、11.25:1（55% 深色）；逾期文字 4.77:1（浅色）、深色非选中逾期角标 7.35:1。均达到 ≥ 4.5:1 与焦点 ≥ 3:1 目标。
 
 ### 9.4 边界与未验证项
 
 - 真实 Tauri 隔离探针已启动并截取 360 × 620 窗口：Bundle ID 改为 `com.todo.desktop.iterationprobe`，`HOME`/`CFFIXED_USER_HOME`、SQLite、Group Container 和 WebKit 数据均落在临时目录，未触碰正式安装应用或用户数据（证据 `output/ui-calendar-surface/tauri-probe/`）。原生拖拽循环、系统“降低透明度”系统级开关和 VoiceOver 仍需真机手动复核；真实 Tauri 窗口的 60% 黑白 A/B 像素采样未执行，合成层由真实 WKWebView 探针覆盖。
-- 本机仅有 Command Line Tools，没有同版 WidgetKit 构建环境；主应用 DMG 为独立本地验收包，不包含 0.3.10 Widget 扩展，也未用上一版 0.3.9 Widget 冒充。完整 WidgetKit DMG 需由同一提交 SHA 的 macOS CI 或完整 Xcode 环境构建。
-- 未推送 `main`、未创建 PR、未修改 CI/审计政策、未触碰正式安装应用或用户数据。
+- 最终主应用 DMG 从最终提交 SHA 重新构建，未复用 `5986baa` 或 `afb56af` 的旧主程序；挂载后复验 Info.plist、arm64、ad-hoc 签名与 `hdiutil verify`。
+- 本机仅有 Command Line Tools，没有同版 WidgetKit 构建环境；`5986baa` 的 CI run 44259624774 已在 WKWebView 回归阶段失败，没有产出可复用的 0.3.10 Widget 扩展。主应用 DMG 为独立本地验收包，不包含 Widget 扩展，也未用上一版 0.3.9 Widget 冒充。完整 WidgetKit DMG 需由最终提交 SHA 的 macOS CI 或完整 Xcode 环境构建。
+- 未推送 `main`、未创建 PR、未修改 CI/审计政策、未触碰正式安装应用或用户数据；最终提交只推送 `dev`。
 
 ### 9.5 发布产物
 
-- 主应用 DMG：`release/macos/BluNote_0.3.10_arm64_local-<提交短 SHA>.dmg`，附 `.sha256`；主应用 `CFBundleShortVersionString`/`CFBundleVersion` 均为 `0.3.10`，`com.todo.desktop`，Mach-O arm64，ad-hoc 签名，`codesign --verify --deep --strict` 通过，`hdiutil verify` 有效。
+- 主应用 DMG：`release/macos/BluNote_0.3.10_arm64_local-<最终提交短 SHA>.dmg`，附 `.sha256` sidecar；主应用 `CFBundleShortVersionString`/`CFBundleVersion` 均为 `0.3.10`，`com.todo.desktop`，Mach-O arm64，ad-hoc 签名，`codesign --verify --deep --strict` 通过，`hdiutil verify` 有效。
 - 本机无完整 Xcode，未构建 0.3.10 WidgetKit 扩展；DMG 明确不包含 `TaskWidget.appex`，也未复用 0.3.9 Widget。Gatekeeper 对 ad-hoc 包返回 rejected 属预期边界，正式分发仍需 Developer ID 签名与公证。

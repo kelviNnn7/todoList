@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import App from "./App";
 import { dateKey, weekDays } from "./lib/calendar";
@@ -62,6 +62,33 @@ describe("日期格指针光束", () => {
     expect(cell).not.toHaveClass("beam-active");
     expect(cell.querySelector(".day-beam")).toBeNull();
     expect(cell).toHaveClass("day-cell");
+  });
+
+  it("键盘焦点可与指针光束同时显示，同页移动不熄灭光束", async () => {
+    const { container } = render(<App/>);
+    await screen.findByText("这一天很清爽");
+    const cell = cells(container)[1];
+
+    act(() => cell.focus());
+    fireEvent.pointerOver(cell, { pointerType: "mouse", buttons: 0 });
+    expect(document.activeElement).toBe(cell);
+    expect(cell).toHaveClass("beam-active");
+    expect(cell.querySelector(".day-beam")).not.toBeNull();
+
+    fireEvent.keyDown(cell, { key: "ArrowRight" });
+    expect(cell).toHaveClass("beam-active");
+  });
+
+  it("只有跨页键盘导航才清除指针光束", async () => {
+    const { container } = render(<App/>);
+    await screen.findByText("这一天很清爽");
+    const cell = cells(container)[2];
+
+    act(() => cell.focus());
+    fireEvent.pointerOver(cell, { pointerType: "mouse", buttons: 0 });
+    expect(cell).toHaveClass("beam-active");
+    fireEvent.keyDown(cell, { key: "ArrowUp" });
+    expect(container.querySelector(".beam-active")).toBeNull();
   });
 
   it("悬停不改变选中、今天下划线或周/月角标结构", async () => {

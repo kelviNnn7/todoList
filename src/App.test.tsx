@@ -107,6 +107,20 @@ describe("App", () => {
     expect(localStorage.getItem(scopedStorageKey("appearanceOpacity"))).toBe("75");
   });
 
+  it("设置浮层打开后焦点留在浮层内，不落到被遮蔽的后台控件", async () => {
+    const user = userEvent.setup(); render(<App/>);
+    await screen.findByText("这一天很清爽");
+    const trigger = screen.getByRole("button", { name: "设置" });
+    await user.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: "更多设置" });
+    for (let index = 0; index < 10; index += 1) {
+      await user.tab();
+      const active = document.activeElement as HTMLElement;
+      expect(dialog.contains(active) || active === trigger).toBe(true);
+      expect(active.closest(".overlay-occluded")).toBeNull();
+    }
+  });
+
   it("可以通过四档滑杆调节并持久化字体大小", async () => {
     const user = userEvent.setup();
     const { container } = render(<App/>);
