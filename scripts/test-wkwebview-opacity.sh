@@ -72,7 +72,7 @@ codesign --force --sign - "$bundle" >/dev/null 2>&1 || true
 set +e
 "$binary" "http://127.0.0.1:${port}/" "$output_dir" >"$output_dir/wkwebview-opacity-run.json" 2>"$output_dir/wkwebview-opacity-stderr.log" &
 probe_pid=$!
-for _ in $(seq 1 180); do
+for _ in $(seq 1 240); do
   if ! kill -0 "$probe_pid" >/dev/null 2>&1; then
     break
   fi
@@ -81,7 +81,7 @@ done
 if kill -0 "$probe_pid" >/dev/null 2>&1; then
   kill "$probe_pid" >/dev/null 2>&1 || true
   wait "$probe_pid" 2>/dev/null || true
-  echo "WKWebView 像素回归超时（180s）。" >&2
+  echo "WKWebView 像素回归超时（240s）。" >&2
   exit 1
 fi
 wait "$probe_pid"

@@ -28,10 +28,12 @@ struct RunResult {
     let keyWindow: Bool
     let images: [String: PixelImage]
     let metadata: [String: String]
+    let points: [(name: String, x: Double, y: Double, radius: Int)]
+    let beam: [String: String]
 }
 
-let backgroundA = "#080d12"
-let backgroundB = "#f7fafc"
+let backgroundA = "#000000"
+let backgroundB = "#ffffff"
 
 func pump(_ seconds: TimeInterval) {
     let deadline = Date().addingTimeInterval(seconds)
@@ -147,6 +149,41 @@ func backgroundDiff(_ lhs: PixelImage, _ rhs: PixelImage, points: [(Double, Doub
     )
 }
 
+
+func patchDiff(_ lhs: PixelImage, _ rhs: PixelImage, x: Double, y: Double, radius: Int, scale: Double) -> ImageDiff {
+    guard lhs.width == rhs.width, lhs.height == rhs.height else {
+        return ImageDiff(mean: .infinity, maxChannel: 255, changedFraction: 1)
+    }
+    let centerX = Int((x * scale).rounded())
+    let centerY = Int((y * scale).rounded())
+    var total = 0.0
+    var maxChannel = 0
+    var changed = 0
+    var pixels = 0
+    for dy in -radius...radius {
+        for dx in -radius...radius {
+            let px = centerX + dx
+            let py = centerY + dy
+            guard px >= 0, py >= 0, px < lhs.width, py < lhs.height else { continue }
+            let offset = (py * lhs.width + px) * 4
+            var pixelChanged = false
+            for channel in 0..<3 {
+                let delta = abs(Int(lhs.bytes[offset + channel]) - Int(rhs.bytes[offset + channel]))
+                total += Double(delta)
+                if delta > maxChannel { maxChannel = delta }
+                if delta > 4 { pixelChanged = true }
+            }
+            if pixelChanged { changed += 1 }
+            pixels += 1
+        }
+    }
+    return ImageDiff(
+        mean: total / Double(max(pixels, 1) * 3),
+        maxChannel: maxChannel,
+        changedFraction: Double(changed) / Double(max(pixels, 1))
+    )
+}
+
 func pngData(_ image: PixelImage) -> Data? {
     guard let rep = NSBitmapImageRep(
         bitmapDataPlanes: nil,
@@ -178,6 +215,7 @@ final class Probe: NSObject, WKNavigationDelegate {
     let window: NSWindow
     var didFinish = false
     var didFail = false
+    var beamImages: [String: PixelImage] = [:]
 
     init(url: URL, background: String, opacity: Int, dark: Bool, label: String) {
         let configuration = WKWebViewConfiguration()
@@ -197,7 +235,15 @@ final class Probe: NSObject, WKNavigationDelegate {
             localStorage.setItem("todo.appearanceOpacity", "\(opacity)");
             localStorage.setItem("todo.calendarView.widget", "week");
             localStorage.setItem("todo.calendarView.expanded", "week");
-            localStorage.setItem("todo.items.v1", "[]");
+            var item = {
+              id: "probe-item", type: "task", title: "像素探针事项", notes: "",
+              startAt: null, endAt: null, dueAt: new Date().toISOString(),
+              location: "", meetingUrl: "", reminderMinutes: null, reminderSentAt: null,
+              reminderAt: null, reminderStatus: "none", snoozeCount: 0, lastReminderAt: null,
+              completed: false, source: "local", subtasks: [], createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(), taskSchedule: null, completedDates: []
+            };
+            localStorage.setItem("todo.items.v1", JSON.stringify([item]));
           } catch (error) {}
         })();
         """
@@ -291,6 +337,331 @@ final class Probe: NSObject, WKNavigationDelegate {
         return imageFromSnapshot(image)
     }
 
+
+    func surfacePoints() -> [(name: String, x: Double, y: Double, radius: Int)] {
+        let script = """
+        (function () {
+          function rect(element) {
+            if (!element) return null;
+            var r = element.getBoundingClientRect();
+            return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height };
+          }
+          var shell = rect(document.querySelector("main.app-shell"));
+          var topbar = rect(document.querySelector(".topbar"));
+          var calendar = rect(document.querySelector(".calendar-panel"));
+          var agenda = rect(document.querySelector(".agenda-header"));
+          var group = rect(document.querySelector(".item-group")) || rect(document.querySelector(".empty-state"));
+          if (!shell || !topbar || !calendar || !agenda || !group) return {};
+          return {
+            shell: { x: 7, y: shell.height / 2, r: 2 },
+            topbar: { x: (topbar.left + topbar.right) / 2, y: (topbar.top + topbar.bottom) / 2, r: 2 },
+            calendar: { x: calendar.right - 6, y: calendar.top + calendar.height / 2, r: 2 },
+            agenda: { x: agenda.right - 8, y: agenda.top + 8, r: 2 },
+            group: { x: group.right - 10, y: group.top + Math.min(36, Math.max(12, group.height - 10)), r: 2 },
+            windowBorder: { x: shell.left + 0.5, y: shell.height / 2, r: 1 },
+            panelBorder: { x: calendar.left + 0.5, y: calendar.top + calendar.height / 2, r: 1 }
+          };
+        })();
+        """
+        guard let value = eval(script) as? [String: [String: Double]] else { return [] }
+        return value.compactMap { key, point in
+            guard let x = point["x"], let y = point["y"], let radius = point["r"] else { return nil }
+            return (key, x, y, Int(radius))
+        }.sorted { $0.0 < $1.0 }
+    }
+
+
+    func beamState(_ script: String) -> [String: String] {
+        guard let value = eval(script) as? [String: Any] else { return [:] }
+        var result: [String: String] = [:]
+        for (key, value) in value { result[key] = String(describing: value) }
+        return result
+    }
+
+    func testBeam() -> [String: String] {
+        // The opacity probe intentionally injects a snapshot-stability rule that
+        // disables all animations. Remove only that injected style before the
+        // motion-state checks; the production stylesheet is external.
+        _ = eval("""
+        (function () {
+          [].slice.call(document.querySelectorAll("style")).forEach(function (style) {
+            if ((style.textContent || "").indexOf("animation: none !important") >= 0) style.remove();
+          });
+          return true;
+        })();
+        """)
+        _ = eval("""
+        (function () {
+          var target = [].slice.call(document.querySelectorAll(".day-cell")).find(function (cell) { return !cell.classList.contains("selected"); });
+          if (!target) return false;
+          window.__beamTarget = target;
+          var event = new MouseEvent("pointerover", { bubbles: true, clientX: 1, clientY: 1 });
+          Object.defineProperty(event, "pointerType", { value: "mouse" });
+          Object.defineProperty(event, "buttons", { value: 0 });
+          target.dispatchEvent(event);
+          return true;
+        })();
+        """)
+        let reduced = (eval("matchMedia('(prefers-reduced-motion: reduce)').matches") as? Bool) ?? false
+        let control = beamState("""
+        (function () {
+          var style = document.createElement("style");
+          style.textContent = "@keyframes wk-control { from { opacity: 0; } to { opacity: 1; } } #wk-control { animation-name: wk-control; animation-duration: 1s; animation-fill-mode: both; } #wk-svg-control { animation-name: wk-control; animation-duration: 1s; animation-fill-mode: both; }";
+          document.head.appendChild(style);
+          var div = document.createElement("div");
+          div.id = "wk-control";
+          document.body.appendChild(div);
+          var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+          svg.setAttribute("width", "10");
+          svg.setAttribute("height", "10");
+          var rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          rect.id = "wk-svg-control";
+          rect.setAttribute("width", "10");
+          rect.setAttribute("height", "10");
+          svg.appendChild(rect);
+          document.body.appendChild(svg);
+          return {
+            divAnimation: getComputedStyle(div).animationName,
+            svgAnimation: getComputedStyle(rect).animationName,
+            supportsAnimation: CSS.supports("animation-name", "wk-control"),
+            supportsDash: CSS.supports("stroke-dashoffset", "0px"),
+            traceAnimationRule: document.querySelectorAll(".day-cell.beam-active .day-beam-trace").length
+          };
+        })();
+        """)
+        _ = eval("""
+        (function () {
+          var target = window.__beamTarget;
+          var trace = target && target.querySelector(".day-beam-trace");
+          var animation = trace ? trace.getAnimations()[0] : null;
+          if (!animation) return false;
+          animation.pause();
+          animation.currentTime = 450;
+          window.__beamAnimation = animation;
+          return true;
+        })();
+        """)
+        pump(0.05)
+        let mid = beamState("""
+        (function () {
+          var target = window.__beamTarget;
+          var trace = target && target.querySelector(".day-beam-trace");
+          var style = trace ? getComputedStyle(trace) : null;
+          var animations = trace ? trace.getAnimations() : [];
+          var animation = animations.length ? animations[0] : null;
+          var timing = animation && animation.effect ? animation.effect.getTiming() : null;
+          return {
+            active: document.querySelectorAll(".beam-active").length,
+            beams: document.querySelectorAll(".day-beam").length,
+            matches: document.querySelectorAll(".day-cell.beam-active .day-beam-trace").length,
+            currentTime: animation && animation.currentTime != null ? animation.currentTime : "",
+            timingDuration: timing ? timing.duration : "",
+            dash: style ? style.strokeDashoffset : "",
+            animation: style ? style.animationName : "",
+            duration: style ? style.animationDuration : "",
+            opacity: style ? style.opacity : "",
+            playState: animation ? animation.playState : ""
+          };
+        })();
+        """)
+        beamImages["beamMid"] = snapshot()
+        _ = eval("""
+        (function () {
+          var animation = window.__beamAnimation;
+          if (!animation) return false;
+          animation.currentTime = 900;
+          animation.finish();
+          return true;
+        })();
+        """)
+        pump(0.05)
+        let end = beamState("""
+        (function () {
+          var target = window.__beamTarget;
+          var trace = target && target.querySelector(".day-beam-trace");
+          var style = trace ? getComputedStyle(trace) : null;
+          var animations = trace ? trace.getAnimations() : [];
+          return {
+            active: document.querySelectorAll(".beam-active").length,
+            dash: style ? style.strokeDashoffset : "",
+            opacity: style ? style.opacity : "",
+            playState: animations.length ? animations[0].playState : ""
+          };
+        })();
+        """)
+        beamImages["beamEnd"] = snapshot()
+        _ = eval("""
+        (function () {
+          var target = window.__beamTarget;
+          var out = new MouseEvent("pointerout", { bubbles: true });
+          Object.defineProperty(out, "pointerType", { value: "mouse" });
+          target.dispatchEvent(out);
+          target.blur();
+          target.focus();
+          return true;
+        })();
+        """)
+        pump(0.05)
+        let keyboard = beamState("({ active: document.querySelectorAll('.beam-active').length })")
+        _ = eval("""
+        (function () {
+          var target = window.__beamTarget;
+          var over = new MouseEvent("pointerover", { bubbles: true });
+          Object.defineProperty(over, "pointerType", { value: "mouse" });
+          target.dispatchEvent(over);
+          window.dispatchEvent(new Event("scroll"));
+          return true;
+        })();
+        """)
+        pump(0.05)
+        let scrolled = beamState("({ active: document.querySelectorAll('.beam-active').length })")
+        _ = eval("""
+        (function () {
+          var target = window.__beamTarget;
+          var over = new MouseEvent("pointerover", { bubbles: true });
+          Object.defineProperty(over, "pointerType", { value: "mouse" });
+          target.dispatchEvent(over);
+          document.querySelectorAll(".view-switch button")[1].click();
+          return true;
+        })();
+        """)
+        pump(0.08)
+        let switched = beamState("({ active: document.querySelectorAll('.beam-active').length })")
+        _ = eval("""
+        (function () {
+          var target = [].slice.call(document.querySelectorAll(".day-cell")).find(function (cell) { return !cell.classList.contains("selected"); }) || document.querySelector(".day-cell");
+          var over = new MouseEvent("pointerover", { bubbles: true });
+          Object.defineProperty(over, "pointerType", { value: "touch" });
+          target.dispatchEvent(over);
+          return true;
+        })();
+        """)
+        pump(0.05)
+        let touch = beamState("({ active: document.querySelectorAll('.beam-active').length })")
+        var forcedMid: [String: String] = [:]
+        var forcedEnd: [String: String] = [:]
+        if reduced {
+            _ = eval("""
+            (function () {
+              var style = document.createElement("style");
+              style.id = "beam-force-animation";
+              style.textContent = ".day-cell.beam-active .day-beam-trace { animation-name: calendar-beam-trace !important; animation-duration: 900ms !important; animation-timing-function: linear !important; animation-fill-mode: both !important; animation-iteration-count: 1 !important; }";
+              document.documentElement.appendChild(style);
+              var target = [].slice.call(document.querySelectorAll(".day-cell")).find(function (cell) { return !cell.classList.contains("selected"); });
+              var over = new MouseEvent("pointerover", { bubbles: true });
+              Object.defineProperty(over, "pointerType", { value: "mouse" });
+              target.dispatchEvent(over);
+              return true;
+            })();
+            """)
+            _ = eval("""
+            (function () {
+              var target = document.querySelector(".beam-active");
+              var trace = target && target.querySelector(".day-beam-trace");
+              var animation = trace ? trace.getAnimations()[0] : null;
+              if (!animation) return false;
+              animation.pause();
+              animation.currentTime = 450;
+              window.__beamForcedAnimation = animation;
+              return true;
+            })();
+            """)
+            pump(0.05)
+            forcedMid = beamState("""
+            (function () {
+              var target = document.querySelector(".beam-active");
+              var trace = target && target.querySelector(".day-beam-trace");
+              var style = trace ? getComputedStyle(trace) : null;
+              var animations = trace ? trace.getAnimations() : [];
+              var animation = animations.length ? animations[0] : null;
+              var timing = animation && animation.effect ? animation.effect.getTiming() : null;
+              return {
+                active: document.querySelectorAll(".beam-active").length,
+                dash: style ? style.strokeDashoffset : "",
+                animation: style ? style.animationName : "",
+                duration: style ? style.animationDuration : "",
+                timingDuration: timing ? timing.duration : "",
+                playState: animation ? animation.playState : ""
+              };
+            })();
+            """)
+            _ = eval("""
+            (function () {
+              var animation = window.__beamForcedAnimation;
+              if (!animation) return false;
+              animation.currentTime = 900;
+              animation.finish();
+              return true;
+            })();
+            """)
+            pump(0.05)
+            forcedEnd = beamState("""
+            (function () {
+              var target = document.querySelector(".beam-active");
+              var trace = target && target.querySelector(".day-beam-trace");
+              var style = trace ? getComputedStyle(trace) : null;
+              var animations = trace ? trace.getAnimations() : [];
+              return {
+                active: document.querySelectorAll(".beam-active").length,
+                dash: style ? style.strokeDashoffset : "",
+                playState: animations.length ? animations[0].playState : ""
+              };
+            })();
+            """)
+            _ = eval("""
+            (function () {
+              var target = document.querySelector(".beam-active");
+              var out = new MouseEvent("pointerout", { bubbles: true });
+              Object.defineProperty(out, "pointerType", { value: "mouse" });
+              if (target) target.dispatchEvent(out);
+              var style = document.getElementById("beam-force-animation");
+              if (style) style.remove();
+              return true;
+            })();
+            """)
+            pump(0.05)
+        }
+        _ = eval("""
+        (function () {
+          var style = document.createElement("style");
+          style.id = "beam-static-fallback";
+          style.textContent = "*, *::before, *::after { animation: none !important; transition: none !important; }";
+          document.documentElement.appendChild(style);
+          var target = [].slice.call(document.querySelectorAll(".day-cell")).find(function (cell) { return !cell.classList.contains("selected"); }) || document.querySelector(".day-cell");
+          var over = new MouseEvent("pointerover", { bubbles: true });
+          Object.defineProperty(over, "pointerType", { value: "mouse" });
+          target.dispatchEvent(over);
+          return true;
+        })();
+        """)
+        pump(0.05)
+        let fallback = beamState("""
+        (function () {
+          var target = document.querySelector(".beam-active");
+          var trace = target && target.querySelector(".day-beam-trace");
+          var ring = target && target.querySelector(".day-beam-static");
+          return {
+            active: document.querySelectorAll(".beam-active").length,
+            traceOpacity: trace ? getComputedStyle(trace).opacity : "",
+            ringStroke: ring ? getComputedStyle(ring).stroke : ""
+          };
+        })();
+        """)
+        var report: [String: String] = [:]
+        report["reduced"] = String(reduced)
+        for (key, value) in control { report["control." + key] = value }
+        for (key, value) in mid { report["mid." + key] = value }
+        for (key, value) in end { report["end." + key] = value }
+        for (key, value) in keyboard { report["keyboard." + key] = value }
+        for (key, value) in scrolled { report["scrolled." + key] = value }
+        for (key, value) in switched { report["switched." + key] = value }
+        for (key, value) in touch { report["touch." + key] = value }
+        for (key, value) in forcedMid { report["forcedMid." + key] = value }
+        for (key, value) in forcedEnd { report["forcedEnd." + key] = value }
+        for (key, value) in fallback { report["fallback." + key] = value }
+        return report
+    }
+
     func metadata() -> [String: String] {
         let script = """
         (function () {
@@ -343,7 +714,7 @@ func runProbe(url: URL, opacity: Int, dark: Bool, background: String, label: Str
     }
     // Wait until the shell material itself is applied. This still happens before
     // any interaction and avoids comparing a pre-CSS flash with the first frame.
-    guard probe.waitFor("(function () { var shell = document.querySelector('main.app-shell'); return document.readyState === 'complete' && !!shell && getComputedStyle(shell).backgroundImage.indexOf('linear-gradient') >= 0; })()") else {
+    guard probe.waitFor("(function () { var shell = document.querySelector('main.app-shell'); return document.readyState === 'complete' && !!shell && (shell.classList.contains('opaque') || getComputedStyle(shell).backgroundImage.indexOf('linear-gradient') >= 0); })()") else {
         print("app shell material did not apply for \(label)")
         return nil
     }
@@ -382,6 +753,7 @@ func runProbe(url: URL, opacity: Int, dark: Bool, background: String, label: Str
 
     var metadata = probe.metadata()
     metadata["keyWindow"] = String(keyWindow)
+    let points = probe.surfacePoints()
     var images: [String: PixelImage] = [
         "firstPaint": firstPaint,
         "ready": ready,
@@ -391,8 +763,13 @@ func runProbe(url: URL, opacity: Int, dark: Bool, background: String, label: Str
         "restored": restored,
     ]
     if let active = active { images["active"] = active }
+    var beam: [String: String] = [:]
+    if opacity == 60 && !dark {
+        beam = probe.testBeam()
+        for (key, image) in probe.beamImages { images[key] = image }
+    }
     probe.close()
-    return RunResult(label: label, keyWindow: keyWindow, images: images, metadata: metadata)
+    return RunResult(label: label, keyWindow: keyWindow, images: images, metadata: metadata, points: points, beam: beam)
 }
 
 func writeJSON(_ value: Any, to url: URL) {
@@ -404,14 +781,17 @@ func writeJSON(_ value: Any, to url: URL) {
 }
 
 func runTests(url: URL, outputDirectory: URL) {
-    let cases: [(name: String, opacity: Int, dark: Bool, activate: Bool)] = [
+    let onlyBeam = ProcessInfo.processInfo.environment["WKWEBVIEW_BEAM_ONLY"] == "1"
+    let allCases: [(name: String, opacity: Int, dark: Bool, activate: Bool)] = [
         ("light-100", 100, false, true),
         ("light-95", 95, false, false),
         ("light-75", 75, false, false),
+        ("light-60", 60, false, false),
         ("light-55", 55, false, false),
         ("dark-100", 100, true, true),
-        ("dark-55", 55, true, false),
+        ("dark-60", 60, true, false),
     ]
+    let cases = onlyBeam ? [("light-60", 60, false, false)] : allCases
     let states = ["firstPaint", "ready", "blur", "focus", "dragging", "restored", "active"]
     var report: [[String: Any]] = []
     var failures: [String] = []
@@ -457,6 +837,68 @@ func runTests(url: URL, outputDirectory: URL) {
             let value = diff(readyA, imageA)
             stability["ready-\(state)"] = ["mean": value.mean, "maxChannel": value.maxChannel, "changedFraction": value.changedFraction]
         }
+        var surfaceReport: [[String: Any]] = []
+        let scale = Double(runA.images["ready"]!.width) / 360.0
+        for point in runA.points {
+            guard let imageA = runA.images["ready"], let imageB = runB.images["ready"] else { continue }
+            let value = patchDiff(imageA, imageB, x: point.x, y: point.y, radius: point.radius, scale: scale)
+            surfaceReport.append([
+                "name": point.name,
+                "x": point.x,
+                "y": point.y,
+                "radius": point.radius,
+                "mean": value.mean,
+                "maxChannel": value.maxChannel,
+                "changedFraction": value.changedFraction,
+            ])
+            let expected = 255.0 * (1.0 - Double(item.opacity) / 100.0)
+            if point.name != "panelBorder" {
+                if item.opacity == 100 {
+                    if value.mean > 0.5 || value.maxChannel > 2 {
+                        failures.append("\(item.name)-\(point.name): 100% surface leaked mean=\(value.mean) max=\(value.maxChannel)")
+                    }
+                } else if abs(value.mean - expected) > 7.65 {
+                    failures.append("\(item.name)-\(point.name): expected alpha diff \(expected) ±7.65, got \(value.mean) max=\(value.maxChannel)")
+                }
+            }
+        }
+        caseReport["surfaceAlpha"] = surfaceReport
+        if !runA.beam.isEmpty {
+            caseReport["beam"] = runA.beam
+            let beam = runA.beam
+            if beam["mid.active"] != "1" || beam["mid.beams"] != "1" {
+                failures.append("\(item.name)-beam: expected exactly one active cell/beam, got active=\(beam["mid.active"] ?? "nil") beams=\(beam["mid.beams"] ?? "nil")")
+            }
+            if beam["reduced"] == "true" {
+                if beam["mid.animation"] != "none" || beam["mid.dash"] != "0px" {
+                    failures.append("\(item.name)-beam: reduced-motion static fallback missing: animation=\(beam["mid.animation"] ?? "nil") dash=\(beam["mid.dash"] ?? "nil")")
+                }
+                if beam["forcedMid.active"] != "1" || beam["forcedMid.animation"] != "calendar-beam-trace" || beam["forcedMid.duration"] != "0.9s" || beam["forcedMid.timingDuration"] != "900" || beam["forcedMid.playState"] != "paused" {
+                    failures.append("\(item.name)-beam: forced animation did not run in WKWebView: \(beam["forcedMid.animation"] ?? "nil") / \(beam["forcedMid.duration"] ?? "nil") / \(beam["forcedMid.playState"] ?? "nil")")
+                }
+                if beam["forcedEnd.active"] != "1" || beam["forcedEnd.dash"] != "0px" || beam["forcedEnd.playState"] != "finished" {
+                    failures.append("\(item.name)-beam: forced 900ms turn did not settle: active=\(beam["forcedEnd.active"] ?? "nil") dash=\(beam["forcedEnd.dash"] ?? "nil") state=\(beam["forcedEnd.playState"] ?? "nil")")
+                }
+            } else {
+                if beam["mid.animation"] != "calendar-beam-trace" || beam["mid.duration"] != "0.9s" {
+                    failures.append("\(item.name)-beam: animation not configured: \(beam["mid.animation"] ?? "nil") / \(beam["mid.duration"] ?? "nil")")
+                }
+                if beam["mid.dash"] == "0px" || beam["mid.dash"] == "100px" || beam["mid.playState"] != "paused" || beam["mid.timingDuration"] != "900" {
+                    failures.append("\(item.name)-beam: trace did not reach the 450ms midpoint: dash=\(beam["mid.dash"] ?? "nil") state=\(beam["mid.playState"] ?? "nil") duration=\(beam["mid.timingDuration"] ?? "nil")")
+                }
+                if beam["end.active"] != "1" || beam["end.dash"] != "0px" || beam["end.playState"] != "finished" {
+                    failures.append("\(item.name)-beam: 900ms single turn did not settle: active=\(beam["end.active"] ?? "nil") dash=\(beam["end.dash"] ?? "nil") state=\(beam["end.playState"] ?? "nil")")
+                }
+            }
+            for key in ["keyboard", "scrolled", "switched", "touch"] {
+                if beam["\(key).active"] != "0" {
+                    failures.append("\(item.name)-beam: \(key) did not clear the beam: \(beam["\(key).active"] ?? "nil")")
+                }
+            }
+            if beam["fallback.active"] != "1" || !["0", ".62"].contains(beam["fallback.traceOpacity"] ?? "") || beam["fallback.ringStroke"] == "none" {
+                failures.append("\(item.name)-beam: static fallback missing: active=\(beam["fallback.active"] ?? "nil") trace=\(beam["fallback.traceOpacity"] ?? "nil") ring=\(beam["fallback.ringStroke"] ?? "nil")")
+            }
+        }
         caseReport["backgroundDiff"] = diffs
         caseReport["backgroundPixelDiff"] = backgroundDiffs
         let calibration = backgroundDiff(runA.images["ready"]!, runB.images["ready"]!, points: calibrationPoints)
@@ -469,7 +911,7 @@ func runTests(url: URL, outputDirectory: URL) {
         report.append(caseReport)
 
         // Persist representative pixels for human review.
-        for state in ["firstPaint", "ready", "blur", "focus", "dragging", "restored", "active"] {
+        for state in ["firstPaint", "ready", "blur", "focus", "dragging", "restored", "active", "beamMid", "beamEnd"] {
             if let image = runA.images[state], let data = pngData(image) {
                 try? data.write(to: outputDirectory.appendingPathComponent("\(item.name)-\(state)-a.png"))
             }

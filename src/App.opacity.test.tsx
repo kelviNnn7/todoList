@@ -15,7 +15,7 @@ const runBootstrap = (storage: Storage) => {
   });
 };
 
-describe("v0.3.9 透明背景回归", () => {
+describe("v0.3.10 透明背景回归", () => {
   beforeEach(() => {
     localStorage.clear();
     document.documentElement.style.removeProperty("--widget-opacity");

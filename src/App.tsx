@@ -29,6 +29,7 @@ type ResizeDirection = "East" | "North" | "NorthEast" | "NorthWest" | "South" | 
 type FontLevel = 1 | 2 | 3 | 4;
 type ToastKind = "info" | "error" | "success";
 type OpenModality = "pointer" | "keyboard";
+interface BeamTarget { date: string; view: CalendarViewMode }
 
 interface UndoRecord {
   itemId: string;
@@ -62,6 +63,7 @@ export default function App() {
   const [items, setItems] = useState<TodoItem[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [focusedDate, setFocusedDate] = useState(new Date());
+  const [beamTarget, setBeamTarget] = useState<BeamTarget | null>(null);
   const [calendarAnchor, setCalendarAnchor] = useState(new Date());
   const [calendarNow, setCalendarNow] = useState(new Date());
   const [viewMode, setViewMode] = useState<CalendarViewMode>(() => savedView(false));
@@ -114,6 +116,7 @@ export default function App() {
   useEffect(() => () => { if (toastTimer.current !== undefined) window.clearTimeout(toastTimer.current); }, []);
 
   const showToday = useCallback((today = new Date()) => {
+    setBeamTarget(null);
     systemDateKey.current = dateKey(today);
     setCalendarNow(today);
     setSelectedDate(today);
@@ -318,6 +321,88 @@ export default function App() {
     };
   }, [endWindowDrag]);
   useEffect(() => {
+    // A hover beam belongs to one pointer over one cell. Scrolling, leaving the
+    // window, resizing or a visibility change invalidates that target.
+    const clearBeam = () => setBeamTarget(null);
+    const clearWhenHidden = () => {
+      if (document.visibilityState === "hidden") clearBeam();
+    };
+    window.addEventListener("scroll", clearBeam, true);
+    window.addEventListener("blur", clearBeam);
+    window.addEventListener("resize", clearBeam);
+    document.addEventListener("mouseleave", clearBeam);
+    document.addEventListener("visibilitychange", clearWhenHidden);
+    return () => {
+      window.removeEventListener("scroll", clearBeam, true);
+      window.removeEventListener("blur", clearBeam);
+      window.removeEventListener("resize", clearBeam);
+      document.removeEventListener("mouseleave", clearBeam);
+      document.removeEventListener("visibilitychange", clearWhenHidden);
+    };
+  }, []);
+  useEffect(() => {
+    // The popover shares the shell material instead of stacking a second alpha
+    // layer. Only text nodes intersecting its footprint are temporarily
+    // transparent; layout, scroll position, focus order and the accessibility
+    // tree stay untouched.
+    if (!formType && !menuOpen) {
+      document.querySelectorAll(".overlay-occluded").forEach((element) => element.classList.remove("overlay-occluded"));
+      return;
+    }
+    let frame = 0;
+    const update = () => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const overlay = document.querySelector<HTMLElement>(".item-form, .app-menu");
+        if (!overlay) return;
+        const box = overlay.getBoundingClientRect();
+        const pad = 6;
+        const left = box.left - pad;
+        const top = box.top - pad;
+        const right = box.right + pad;
+        const bottom = box.bottom + pad;
+        const marked = new Set<HTMLElement>();
+        const intersects = (rect: DOMRect) => rect.width > 0 && rect.height > 0 && rect.right > left && rect.left < right && rect.bottom > top && rect.top < bottom;
+        const roots = [document.querySelector<HTMLElement>(".topbar"), document.querySelector<HTMLElement>(".workspace")].filter((root): root is HTMLElement => Boolean(root));
+        for (const root of roots) {
+          const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+          let node = walker.nextNode();
+          while (node) {
+            if (node.textContent?.trim()) {
+              const parent = node.parentElement;
+              if (parent && !parent.closest(".app-menu, .popover-layer") && intersects(parent.getBoundingClientRect())) marked.add(parent);
+            }
+            node = walker.nextNode();
+          }
+          for (const element of root.querySelectorAll<HTMLElement>("button, a, input, textarea, select, img, svg")) {
+            if (!element.closest(".app-menu, .popover-layer") && intersects(element.getBoundingClientRect())) marked.add(element);
+          }
+        }
+        document.querySelectorAll(".overlay-occluded").forEach((element) => {
+          if (!marked.has(element as HTMLElement)) element.classList.remove("overlay-occluded");
+        });
+        marked.forEach((element) => element.classList.add("overlay-occluded"));
+      });
+    };
+    update();
+    const overlay = document.querySelector<HTMLElement>(".item-form, .app-menu");
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    if (overlay) observer?.observe(overlay);
+    const mutations = overlay && typeof MutationObserver !== "undefined" ? new MutationObserver(update) : null;
+    mutations?.observe(overlay!, { attributes: true, attributeFilter: ["style", "data-phase"] });
+    const list = document.querySelector<HTMLElement>(".agenda-body");
+    window.addEventListener("resize", update);
+    list?.addEventListener("scroll", update, { passive: true });
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      observer?.disconnect();
+      mutations?.disconnect();
+      window.removeEventListener("resize", update);
+      list?.removeEventListener("scroll", update);
+      document.querySelectorAll(".overlay-occluded").forEach((element) => element.classList.remove("overlay-occluded"));
+    };
+  }, [formType, menuOpen, selectedDate, filter, expandedWindow, appearanceFontLevel, viewMode]);
+  useEffect(() => {
     if (!isDesktopRuntime()) return;
     let unlisten: (() => void) | undefined;
     listen<string>("deep-link", (payload) => {
@@ -467,12 +552,14 @@ export default function App() {
     });
   }
   function chooseView(next: CalendarViewMode) {
+    setBeamTarget(null);
     setViewMode(next);
     setCalendarAnchor(selectedDate);
     setFocusedDate(selectedDate);
     writeScopedValue(`calendarView.${expandedWindow ? "expanded" : "widget"}`, next);
   }
   async function toggleWindow() {
+    setBeamTarget(null);
     const next = !expandedWindow;
     setExpandedWindow(next);
     writeScopedValue(`calendarView.${next ? "expanded" : "widget"}`, viewMode);
@@ -515,6 +602,7 @@ export default function App() {
     }
   }
   function navigateCalendar(direction: -1 | 1) {
+    setBeamTarget(null);
     const nextAnchor = viewMode === "week" ? addDays(calendarAnchor, direction * 7) : addMonths(calendarAnchor, direction);
     const nextDays = viewMode === "week" ? weekDays(nextAnchor) : monthDays(nextAnchor);
     setCalendarAnchor(nextAnchor);
@@ -522,6 +610,7 @@ export default function App() {
   }
   const calendarTitle = viewMode === "week" ? `${format(days[0], "M月d日")} — ${format(days[6], "M月d日")}` : format(calendarAnchor, "yyyy年 M月");
   function handleGridKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    setBeamTarget(null);
     const key = event.key;
     if (key === "Enter" || key === " ") {
       event.preventDefault();
@@ -538,12 +627,14 @@ export default function App() {
   }
   function startWindowResize(direction: ResizeDirection, event: React.PointerEvent) {
     event.preventDefault(); event.stopPropagation();
+    setBeamTarget(null);
     if (!isDesktopRuntime()) return;
     void startResizeDragging(direction);
   }
   async function startWindowDrag(event: React.MouseEvent) {
     if (locked || draggingRef.current || event.button !== 0 || (event.target as HTMLElement).closest("button,input,select,textarea,a,label,.app-menu,.item-form,[role=separator]")) return;
     event.preventDefault();
+    setBeamTarget(null);
     draggingRef.current = true;
     const token = dragTokenRef.current + 1;
     dragTokenRef.current = token;
@@ -570,7 +661,8 @@ export default function App() {
     onEdit={(value, trigger) => openEdit(value, trigger)}
   />;
 
-  return <main className={`app-shell ${expandedWindow ? "expanded" : "compact"} ${appearanceOpacity === 100 ? "opaque" : ""} ${desktopWidget ? "desktop-widget" : ""} ${locked ? "position-locked" : ""} ${dragging ? "dragging" : ""}`} style={{ "--widget-opacity": appearanceOpacity / 100, "--font-scale": fontScale[appearanceFontLevel] } as React.CSSProperties}>
+  return <main className={`app-shell ${expandedWindow ? "expanded" : "compact"} ${appearanceOpacity === 100 ? "opaque" : ""} ${desktopWidget ? "desktop-widget" : ""} ${locked ? "position-locked" : ""} ${dragging ? "dragging" : ""}`} data-font-level={appearanceFontLevel} style={{ "--widget-opacity": appearanceOpacity / 100, "--font-scale": fontScale[appearanceFontLevel] } as React.CSSProperties}>
+    <svg className="day-beam-defs" aria-hidden="true" focusable="false"><defs><linearGradient id="day-beam-gradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#0a84ff"/><stop offset=".55" stopColor="#22b8e6"/><stop offset="1" stopColor="#67e8f9"/></linearGradient></defs></svg>
     {resizeDirections.map((direction) => <div key={direction} className={`window-resize-handle resize-${direction.toLowerCase()}`} aria-hidden="true" onPointerDown={(event) => startWindowResize(direction, event)}/>)}
     <div className="drag-region" onMouseDown={startWindowDrag}/>
     <header className="topbar" onMouseDown={startWindowDrag}>
@@ -628,17 +720,29 @@ export default function App() {
           {days.map((day) => {
             const badge = calendarBadge(items, day, calendarNow);
             const selected = isSameDay(day, selectedDate);
+            const key = dateKey(day);
+            const beaming = beamTarget?.date === key && beamTarget.view === viewMode;
             const label = `${dayLabel(day)}${isToday(day) ? "，今天" : ""}${selected ? "，已选中" : ""}，${badge.count > 0 ? `${badge.count} 项待处理` : "无待处理事项"}${badge.overdue ? "，有逾期事项" : ""}`;
             return <button
-              key={dateKey(day)}
-              className={`day-cell ${selected ? "selected" : ""} ${isToday(day) ? "today" : ""} ${viewMode === "month" && !isSameMonth(day, calendarAnchor) ? "outside-month" : ""} ${badge.overdue ? "has-overdue" : ""}`}
-              data-date={dateKey(day)}
+              key={key}
+              className={`day-cell ${selected ? "selected" : ""} ${isToday(day) ? "today" : ""} ${viewMode === "month" && !isSameMonth(day, calendarAnchor) ? "outside-month" : ""} ${badge.overdue ? "has-overdue" : ""} ${beaming ? "beam-active" : ""}`}
+              data-date={key}
               tabIndex={isSameDay(day, focusedDate) ? 0 : -1}
               aria-label={label}
               aria-pressed={selected}
+              onPointerOver={(event) => {
+                if (event.pointerType !== "mouse" || event.buttons !== 0) return;
+                if ((event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) return;
+                setBeamTarget({ date: key, view: viewMode });
+              }}
+              onPointerOut={(event) => {
+                if ((event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) return;
+                setBeamTarget((current) => current?.date === key && current.view === viewMode ? null : current);
+              }}
               onFocus={() => setFocusedDate(day)}
               onClick={() => { setSelectedDate(day); setFocusedDate(day); }}
             >
+              {beaming && <svg className="day-beam" aria-hidden="true" focusable="false"><rect className="day-beam-static" x="0" y="0" width="100%" height="100%" rx="8"/><rect className="day-beam-trace" x="0" y="0" width="100%" height="100%" rx="8" pathLength="100"/></svg>}
               {viewMode === "week" && <span className="day-weekday">{weekdayLabels[(day.getDay() + 6) % 7]}</span>}
               <strong className="day-number">{format(day, "d")}</strong>
               {viewMode === "week"

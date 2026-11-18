@@ -2,13 +2,13 @@
 
 BluNote 是一款面向 macOS 的轻量桌面待办挂件，用紧凑的日历、任务和会议视图帮助用户管理当天安排。应用采用 Tauri 2、React 19 与本地 SQLite，数据与设置默认只保存在本机。
 
-当前版本：`main` 为 `0.3.8`，`dev` 为 `0.3.9`
+当前版本：`main` 为 `0.3.8`，`dev` 为 `0.3.10`
 
 ## 支持平台
 
 | 平台 | 最低要求 | 当前构建说明 |
 |---|---|---|
-| macOS | macOS 13 | 本地 DMG 按构建机器架构生成；`main` 稳定包为 Apple Silicon `arm64` 0.3.8，`dev` 迭代包为 0.3.9 |
+| macOS | macOS 13 | 本地 DMG 按构建机器架构生成；`main` 稳定包为 Apple Silicon `arm64` 0.3.8，`dev` 迭代包为 0.3.10 |
 
 面向外部用户正式分发前，macOS 安装包需要 Developer ID 签名与 Apple 公证。Intel 与 Apple Silicon 通用的安装包还需要额外构建 Universal 2 产物。
 
@@ -36,19 +36,19 @@ BluNote 是一款面向 macOS 的轻量桌面待办挂件，用紧凑的日历�
 - 收起状态为 `360 × 620` 紧凑挂件，展开状态为 `900 × 640` 双栏窗口；最小支持 `340 × 520`。
 - 紧凑态顺序为顶栏、日历、日期标题与分类、可滚动清单；展开后待办与日历左右排列，各占可用画幅的 50%，并按“全天”和“有时间”共用分组表面。
 - 待办列表可独立上下滚动，并支持键盘聚焦；四档字体与长中英文项目在最小窗口下不裁切、不横向溢出。
-- 日期格 Tab 只保留一个入口，左右按日、上下按周移动焦点，在周/月边界继续浏览；Enter 或空格才选中日期。今天使用下划线、选中使用钴蓝底、键盘焦点使用独立外环，鼠标悬停只改变底色，V2 已取消上一版光束动效。
+- 日期格 Tab 只保留一个入口，左右按日、上下按周移动焦点，在周/月边界继续浏览；Enter 或空格才选中日期。今天使用下划线、选中使用钴蓝底、键盘焦点使用独立外环；鼠标指针进入日期格时显示 900 ms 单圈蓝青边缘光束，随后停在静态淡描边，移出/滚动/切视图/失焦/拖动清理，键盘焦点与触摸不启动光束。
 - 周/月视图偏好分别保存；设置和新建浮层互斥，点击设置外部自动收起。
 
 ### 桌面窗口
 
 - 无边框透明窗口，适配 macOS 明暗外观。
-- 采用 V2 组合界面：浅色近 `#F7F8FA` 外壳、白色分组面与钴蓝 `#2448BE` 强调；深色使用 `#171D29` / `#222B3A` 与亮蓝强调，支持高对比度、减少动态和降低透明度回退。
+- 采用 V2 组合界面：浅色近 `#F7F8FA` 外壳与钴蓝 `#2448BE` 强调；深色使用 `#171D29` / `#222B3A` 与亮蓝强调，支持高对比度、减少动态和降低透明度回退。顶栏、日历、清单、空态、设置和浮层共用同一外壳材质 alpha，以描边、留白和低 alpha 状态色分隔。
 - 鼠标按压主要操作缩放至 97% 并在 120 ms 内恢复；快速新增浮层以 180 ms 进入、120 ms 退出并自锚点缩放淡入，键盘与减少动态模式立即完成，不引入动画依赖。
 - 设置使用四档滑杆调节字体，当前标准字号为第 1 档，后续三档逐级放大；界面不额外显示档位百分比提示，点击设置栏外部时自动收起。
 - 支持拖动窗口、八方向边缘拉伸、位置锁定与 8 px 屏幕边缘吸附。
 - 窗口始终限制在当前显示器的可视工作区内。
 - 冷启动固定使用正常紧凑尺寸，仅恢复上次窗口位置，避免 Retina 物理像素导致的缩放异常。
-- 支持 55%–100% 外观透明度调节。透明度只作用于窗口外壳，标题文字、日历、清单和浮层表面保持不透明或高可读；低档位保留可见透底区，拖动结束、失焦和重新聚焦不会改变用户设置。
+- 支持 55%–100% 外观透明度调节，5% 步进并在 React 挂载前读取。所有可见材质共用一次 alpha 合成，避免外壳与面板重复叠加；100% 使用确定性实色，55/60/75/95 按档透底；系统“降低透明度”时强制不透但保留滑杆值。浮层打开时仅遮蔽重叠正文，不改变布局、滚动或焦点。
 - 支持普通窗口与桌面小组件模式切换。
 - 支持关闭后托盘驻留、单实例运行和开机自启。
 
@@ -128,7 +128,7 @@ cargo audit --file src-tauri/Cargo.lock
 
 `npm run verify:version` 校验 `package.json`、`src-tauri/tauri.conf.json` 与 `src-tauri/Cargo.toml` 的版本完整性，主版本不一致或完整版本漂移都会直接失败。提交前还应运行 `npm audit --audit-level=moderate` 与 `cargo audit --file src-tauri/Cargo.lock`（首次使用需 `cargo install cargo-audit --locked`）；GitHub Actions 会运行依赖审计、覆盖率门禁、WKWebView 透明度像素回归并构建 macOS 安装包。
 
-`npm run test:webkit` 使用真实 macOS WKWebView、非持久化数据目录和本地生产构建，在两个强对比页面背景上截图比较外壳内部像素：100% 必须完全遮挡背景，55/75/95 必须按档位可透，并覆盖首次绘制、blur/focus 与 dragging 状态。该命令只在 macOS 上运行，产物写入 `output/opacity-fix/`。测试不点击、不聚焦、不依赖定时重绘；若当前前台应用限制测试进程取得系统 key window，JSON 会记录 `keyWindow=false`，不会把模拟激活冒充为真机激活。v0.3.9 的 V2 截图与布局/键盘冒烟使用真实生产构建和 Chromium 渲染，输出到 ignored `output/ui-v2/`；本轮窄窗与 55% 承载面复测输出到 `output/ui-v2-polish/`。
+`npm run test:webkit` 使用真实 macOS WKWebView、非持久化数据目录和本地生产构建，分别在纯黑/纯白背景上截图比较外壳、顶栏、日历、日程头、事项卡和窗口描边的平坦像素：v0.3.10 在 60% 档六类表面的通道差均为 102/255，55/75/95 约 115/64/13，100% 为 0；并覆盖首次绘制、blur/focus、dragging 与 60% 指针光束的 900 ms 时间轴、静态降级和清理状态。该命令只在 macOS 上运行，可传入证据目录（本轮为 `output/ui-calendar-surface/wkwebview/`）。Chromium 生产构建回归覆盖 340 × 520 / 360 × 620 / 900 × 640、四档字号、浅深主题、55/60/75/95/100、浮层与遮罩降级，证据输出到 ignored `output/ui-calendar-surface/`。
 
 常用命令：
 
@@ -197,7 +197,7 @@ macOS CI 会为每个提交构建包含 WidgetKit 的完整 DMG，产物名称�
 - 当前不支持账号体系或跨设备同步。
 - 当前不支持 Apple EventKit、Microsoft Outlook 账户直连，仅支持 ICS 文件导入。
 - macOS WidgetKit 需要完整 Xcode、App Group 和正式 Apple Team 签名。
-- 仅安装 Xcode Command Line Tools 时，`npm run tauri build` 只能生成主应用 DMG；包含 WidgetKit 扩展的 DMG 必须使用完整 Xcode。
+- 仅安装 Xcode Command Line Tools 时，`npm run tauri build` 只能生成主应用 DMG；包含 WidgetKit 扩展的 DMG 必须使用完整 Xcode。v0.3.10 本机 DMG 因此只包含主应用，不把上一版 0.3.9 Widget 伪装为 0.3.10；完整 WidgetKit 包需由同 SHA 的 macOS CI 或具备完整 Xcode 的环境补齐。
 - 正式公开分发仍需完成 macOS Developer ID 签名与 Apple 公证；当前开发机未发现有效 codesigning identity，这是外部发布阻塞，不是代码缺陷。
 - 当前本地 macOS 安装包为 Apple Silicon `arm64`，Intel Mac 需要单独的 x86_64 或 Universal 2 构建；CI 产物架构以构建 runner 为准并在文件名中标注。
 
