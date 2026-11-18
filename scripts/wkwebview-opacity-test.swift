@@ -104,14 +104,11 @@ func backgroundDiff(_ lhs: PixelImage, _ rhs: PixelImage) -> ImageDiff {
     guard lhs.width == rhs.width, lhs.height == rhs.height else {
         return ImageDiff(mean: .infinity, maxChannel: 255, changedFraction: 1)
     }
-    // Fixed patches in the shell padding/empty bottom area. These never contain
-    // text or controls, so the comparison isolates the shell background even
-    // when the loading -> empty-state content timing differs between runs.
-    // V2 compact layout: the empty agenda has no opaque group surface and its
-    // bottom padding is pure shell material. Sample that strip so the probe
-    // isolates the window background instead of empty-state text antialiasing.
+    // Fixed patches in the shell's left/right padding. These never contain text,
+    // controls, or the transparent workspace/resize layers, so the comparison
+    // isolates the shell material itself even when content timing differs.
     let points: [(Double, Double)] = [
-        (0.08, 0.974), (0.92, 0.974), (0.50, 0.974), (0.25, 0.968), (0.75, 0.968),
+        (0.017, 0.25), (0.017, 0.50), (0.017, 0.75), (0.983, 0.25), (0.983, 0.75),
     ]
     var total = 0.0
     var maxChannel = 0
