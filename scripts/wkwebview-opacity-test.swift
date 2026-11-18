@@ -41,22 +41,23 @@ func pump(_ seconds: TimeInterval) {
 }
 
 func imageFromSnapshot(_ image: NSImage) -> PixelImage? {
-    guard let tiff = image.tiffRepresentation,
-          let rep = NSBitmapImageRep(data: tiff),
-          let cgImage = rep.cgImage else {
+    guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
         return nil
     }
-    let width = rep.pixelsWide
-    let height = rep.pixelsHigh
+    let width = cgImage.width
+    let height = cgImage.height
     let bytesPerRow = width * 4
     var bytes = [UInt8](repeating: 0, count: bytesPerRow * height)
+    // Keep the snapshot's own color space. Converting every frame through
+    // DeviceRGB adds 1-2 level dithering noise on some macOS versions, which is
+    // larger than the 100% opacity tolerance and unrelated to backdrop leakage.
     guard let context = CGContext(
         data: &bytes,
         width: width,
         height: height,
         bitsPerComponent: 8,
         bytesPerRow: bytesPerRow,
-        space: CGColorSpaceCreateDeviceRGB(),
+        space: cgImage.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
         bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
     ) else {
         return nil
