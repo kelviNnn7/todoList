@@ -895,7 +895,7 @@ func runTests(url: URL, outputDirectory: URL) {
                     failures.append("\(item.name)-beam: \(key) did not clear the beam: \(beam["\(key).active"] ?? "nil")")
                 }
             }
-            if beam["fallback.active"] != "1" || !["0", ".62"].contains(beam["fallback.traceOpacity"] ?? "") || beam["fallback.ringStroke"] == "none" {
+            if beam["fallback.active"] != "1" || !["0", ".62", "0.62"].contains(beam["fallback.traceOpacity"] ?? "") || beam["fallback.ringStroke"] == "none" {
                 failures.append("\(item.name)-beam: static fallback missing: active=\(beam["fallback.active"] ?? "nil") trace=\(beam["fallback.traceOpacity"] ?? "nil") ring=\(beam["fallback.ringStroke"] ?? "nil")")
             }
         }
