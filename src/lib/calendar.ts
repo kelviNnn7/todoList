@@ -1,6 +1,6 @@
 import { addDays, endOfMonth, endOfWeek, format, isBefore, isSameDay, parseISO, startOfDay, startOfMonth, startOfWeek } from "date-fns";
 import { zhCN } from "date-fns/locale";
-import type { TodoItem } from "../types";
+import type { FilterType, TodoItem } from "../types";
 
 export function weekDays(anchor: Date): Date[] {
   const first = startOfWeek(startOfDay(anchor), { weekStartsOn: 1 });
@@ -41,6 +41,10 @@ export function itemsForDate(items: TodoItem[], date: Date): TodoItem[] {
   return items.filter((item) => isItemScheduledForDate(item, date));
 }
 
+export function isMeetingPending(item: TodoItem, now = new Date()): boolean {
+  return item.type === "meeting" && !item.completed && Boolean(item.startAt && parseISO(item.startAt).getTime() > now.getTime());
+}
+
 export function calendarBadge(items: TodoItem[], date: Date, now = new Date()): { count: number; overdue: boolean } {
   const dateIsPast = isBefore(startOfDay(date), startOfDay(now));
   return itemsForDate(items, date).reduce<{ count: number; overdue: boolean }>((badge, item) => {
@@ -51,9 +55,38 @@ export function calendarBadge(items: TodoItem[], date: Date, now = new Date()): 
       }
       return badge;
     }
-    if (!item.completed && item.startAt && parseISO(item.startAt).getTime() > now.getTime()) badge.count += 1;
+    if (isMeetingPending(item, now)) badge.count += 1;
     return badge;
   }, { count: 0, overdue: false });
+}
+
+/**
+ * Pending count for the selected day header. It follows the same projection as
+ * the calendar badge: incomplete task occurrences plus meetings that have not
+ * started yet. Completed items stay in the list but never inflate this count.
+ */
+export function pendingCountForDate(items: TodoItem[], date: Date, filter: FilterType = "all", now = new Date()): number {
+  return itemsForDate(items, date).reduce((count, item) => {
+    if (filter !== "all" && item.type !== filter) return count;
+    if (item.type === "task") return count + (itemOccurrenceForDate(item, date).completed ? 0 : 1);
+    return count + (isMeetingPending(item, now) ? 1 : 0);
+  }, 0);
+}
+
+export interface AgendaGroups {
+  allDay: TodoItem[];
+  timed: TodoItem[];
+}
+
+/** Expanded desktop layout groups a shared surface by all-day and timed rows. */
+export function groupAgendaItems(items: TodoItem[]): AgendaGroups {
+  const ordered = sortItems(items);
+  return {
+    allDay: ordered.filter((item) => item.type === "task" || !item.startAt),
+    timed: ordered
+      .filter((item) => item.type === "meeting" && item.startAt)
+      .sort((a, b) => (itemDate(a)?.getTime() ?? 0) - (itemDate(b)?.getTime() ?? 0)),
+  };
 }
 
 export function isOverdue(item: TodoItem, now = new Date()): boolean {
@@ -70,8 +103,9 @@ export function dateKey(date: Date): string {
 }
 
 export function sortItems(items: TodoItem[]): TodoItem[] {
+  // Completion never reorders the list: a row keeps its position so focus,
+  // reading order and scroll offset stay stable when the user checks it.
   return [...items].sort((a, b) => {
-    if (a.completed !== b.completed) return Number(a.completed) - Number(b.completed);
     const ad = itemDate(a)?.getTime() ?? Number.MAX_SAFE_INTEGER;
     const bd = itemDate(b)?.getTime() ?? Number.MAX_SAFE_INTEGER;
     return ad - bd || b.createdAt.localeCompare(a.createdAt);

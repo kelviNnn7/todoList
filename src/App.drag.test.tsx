@@ -101,7 +101,7 @@ describe("App 窗口拖动与透明度", () => {
     fireEvent.mouseDown(topbar, { button: 0 });
     await waitFor(() => expect(desktop.startDragging).toHaveBeenCalledTimes(1));
 
-    fireEvent.mouseDown(screen.getByRole("button", { name: "更多选项" }), { button: 0 });
+    fireEvent.mouseDown(screen.getByRole("button", { name: "设置" }), { button: 0 });
     expect(desktop.startDragging).toHaveBeenCalledTimes(1);
   });
 

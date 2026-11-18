@@ -293,7 +293,7 @@ final class Probe: NSObject, WKNavigationDelegate {
           if (!shell) return {};
           var style = getComputedStyle(shell);
           var before = getComputedStyle(shell, "::before");
-          var heading = document.querySelector("h1");
+          var heading = document.querySelector(".agenda-heading h2") || document.querySelector("h1");
           return {
             inlineOpacity: shell.style.getPropertyValue("--widget-opacity"),
             documentOpacity: document.documentElement.style.getPropertyValue("--widget-opacity"),

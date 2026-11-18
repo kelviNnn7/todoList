@@ -22,7 +22,7 @@ describe("ItemCard", () => {
   it("展开后可独立完成子任务", async () => {
     const onChange = vi.fn().mockResolvedValue(undefined); const user = userEvent.setup();
     render(<ItemCard item={task} onChange={onChange} onDelete={vi.fn()} onEdit={vi.fn()}/>);
-    await user.click(screen.getByRole("button", { name: "展开子任务" }));
+    await user.click(screen.getByRole("button", { name: "展开详情" }));
     await user.click(screen.getByRole("checkbox", { name: /完成测试/ }));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ completed: true }));
   });
@@ -35,8 +35,8 @@ describe("ItemCard", () => {
   it("展开后可以继续编辑事项", async () => {
     const onEdit = vi.fn(); const user = userEvent.setup();
     render(<ItemCard item={task} onChange={vi.fn()} onDelete={vi.fn()} onEdit={onEdit}/>);
-    await user.click(screen.getByRole("button", { name: "展开子任务" }));
+    await user.click(screen.getByRole("button", { name: "展开详情" }));
     await user.click(screen.getByRole("button", { name: `编辑任务：${task.title}` }));
-    expect(onEdit).toHaveBeenCalledWith(task);
+    expect(onEdit).toHaveBeenCalledWith(task, expect.anything());
   });
 });

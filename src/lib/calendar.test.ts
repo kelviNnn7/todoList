@@ -2,13 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   calendarBadge,
   dateKey,
+  groupAgendaItems,
   isItemScheduledForDate,
+  isMeetingPending,
   isOverdue,
   itemDate,
   itemOccurrenceForDate,
   itemsForDate,
   longDate,
   monthDays,
+  pendingCountForDate,
   sortItems,
   weekDays,
 } from "./calendar";
@@ -163,7 +166,35 @@ describe("calendar", () => {
     const completed = item({ id: "completed", completed: true, dueAt: null });
     const undated = item({ id: "undated", dueAt: null });
     expect(sortItems([completed, undated, older, later, newer]).map((entry) => entry.id)).toEqual([
-      "newer", "older", "later", "undated", "completed",
+      "newer", "older", "later", "completed", "undated",
     ]);
+  });
+});
+
+describe("calendar pending projection and agenda grouping", () => {
+  it("待处理计数排除已完成例次与已开始会议，并跟随筛选", () => {
+    const date = new Date(2026, 10, 17, 12);
+    const now = new Date(2026, 10, 17, 10);
+    const task = item({ id: "task", dueAt: new Date(2026, 10, 17, 23, 59).toISOString() });
+    const completed = item({ id: "completed", completed: true, dueAt: new Date(2026, 10, 17, 23, 59).toISOString() });
+    const recurringDone = item({
+      id: "recurring", taskSchedule: { mode: "weekly", startsOn: "2026-11-17", weekdays: [2] }, completedDates: ["2026-11-17"],
+    });
+    const upcoming = item({ id: "upcoming", type: "meeting", dueAt: null, startAt: new Date(2026, 10, 17, 11).toISOString() });
+    const started = item({ id: "started", type: "meeting", dueAt: null, startAt: new Date(2026, 10, 17, 9).toISOString() });
+    const items = [task, completed, recurringDone, upcoming, started];
+
+    expect(pendingCountForDate(items, date, "all", now)).toBe(2);
+    expect(pendingCountForDate(items, date, "task", now)).toBe(1);
+    expect(pendingCountForDate(items, date, "meeting", now)).toBe(1);
+    expect(isMeetingPending(upcoming, now)).toBe(true);
+    expect(isMeetingPending(started, now)).toBe(false);
+  });
+
+  it("展开清单按全天任务与有时间会议分组并保持会议时间顺序", () => {
+    const allDay = item({ id: "all-day", type: "task" });
+    const later = item({ id: "later", type: "meeting", dueAt: null, startAt: new Date(2026, 7, 18, 15).toISOString() });
+    const earlier = item({ id: "earlier", type: "meeting", dueAt: null, startAt: new Date(2026, 7, 18, 9).toISOString() });
+    expect(groupAgendaItems([later, allDay, earlier])).toEqual({ allDay: [allDay], timed: [earlier, later] });
   });
 });

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { TodoItem } from "../types";
@@ -28,11 +28,12 @@ describe("ItemForm editing", () => {
     render(<ItemForm date={new Date(2026, 7, 27)} initialType="task" onClose={vi.fn()} onSave={onSave}/>);
 
     await user.type(screen.getByLabelText("标题"), "每周复盘");
+    await user.click(screen.getByRole("button", { name: /更多设置/ }));
     await user.click(screen.getByRole("button", { name: "每周" }));
     await user.click(screen.getByRole("button", { name: "星期一" }));
     await user.click(screen.getByRole("button", { name: "星期三" }));
     await user.click(screen.getByRole("button", { name: "星期四" }));
-    await user.click(screen.getByRole("button", { name: "保存事项" }));
+    await user.click(screen.getByRole("button", { name: "保存任务" }));
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
       title: "每周复盘",
@@ -46,7 +47,7 @@ describe("ItemForm editing", () => {
     const user = userEvent.setup(); const onSave = vi.fn().mockResolvedValue(undefined);
     render(<ItemForm date={new Date()} initialType="task" initialItem={task} onClose={vi.fn()} onSave={onSave}/>);
 
-    expect(screen.getByRole("dialog", { name: "继续编辑任务" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "编辑任务" })).toBeInTheDocument();
     expect(screen.getByLabelText("标题")).toHaveValue(task.title);
     expect(screen.getByLabelText("子任务 1")).toHaveValue("回归测试");
     await user.clear(screen.getByLabelText("标题"));
@@ -64,7 +65,7 @@ describe("ItemForm editing", () => {
     const user = userEvent.setup(); const onSave = vi.fn().mockResolvedValue(undefined);
     render(<ItemForm date={new Date()} initialType="meeting" initialItem={meeting} onClose={vi.fn()} onSave={onSave}/>);
 
-    expect(screen.getByRole("dialog", { name: "继续编辑会议" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "编辑会议" })).toBeInTheDocument();
     expect(screen.getByLabelText("地点")).toHaveValue("3A 会议室");
     expect(screen.getByLabelText("会议链接")).toHaveValue(meeting.meetingUrl);
     expect(screen.getByLabelText("提前提醒")).toHaveValue("30");
@@ -76,5 +77,45 @@ describe("ItemForm editing", () => {
       id: meeting.id, title: meeting.title, location: "5B 会议室", createdAt: meeting.createdAt,
       reminderSentAt: meeting.reminderSentAt,
     }));
+  });
+});
+
+describe("ItemForm quick create and failure handling", () => {
+  it("只填标题即可保存，日期默认取当前选中日并立即聚焦标题", async () => {
+    const user = userEvent.setup(); const onSave = vi.fn().mockResolvedValue(undefined); const onClose = vi.fn();
+    render(<ItemForm date={new Date(2026, 10, 17)} initialType="task" onClose={onClose} onSave={onSave}/>);
+
+    expect(screen.getByLabelText("标题")).toHaveFocus();
+    expect(screen.getByLabelText("日期")).toHaveValue("2026-11-17");
+    await user.type(screen.getByLabelText("标题"), "汇总评审反馈");
+    await user.click(screen.getByRole("button", { name: "保存任务" }));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ title: "汇总评审反馈", type: "task", notes: "", subtasks: [] }));
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it("保存失败保留输入与浮层，并可重试且不会重复提交", async () => {
+    const user = userEvent.setup();
+    let rejectFirst: () => void = () => undefined;
+    const onSave = vi.fn()
+      .mockImplementationOnce(() => new Promise<void>((_, reject) => { rejectFirst = () => reject(new Error("保存失败，请重试")); }))
+      .mockResolvedValueOnce(undefined);
+    const onClose = vi.fn();
+    render(<ItemForm date={new Date(2026, 10, 17)} initialType="task" onClose={onClose} onSave={onSave}/>);
+
+    await user.type(screen.getByLabelText("标题"), "汇总评审反馈");
+    const save = screen.getByRole("button", { name: "保存任务" });
+    fireEvent.click(save);
+    fireEvent.click(save);
+    expect(onSave).toHaveBeenCalledTimes(1);
+
+    rejectFirst();
+    expect(await screen.findByRole("alert")).toHaveTextContent("输入已保留");
+    expect(screen.getByLabelText("标题")).toHaveValue("汇总评审反馈");
+    expect(onClose).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "保存任务" }));
+    expect(onSave).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 });
