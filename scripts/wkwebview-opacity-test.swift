@@ -101,16 +101,20 @@ func diff(_ lhs: PixelImage, _ rhs: PixelImage) -> ImageDiff {
     )
 }
 
-func backgroundDiff(_ lhs: PixelImage, _ rhs: PixelImage) -> ImageDiff {
+let shellBackgroundPoints: [(Double, Double)] = [
+    (0.017, 0.25), (0.017, 0.50), (0.017, 0.75), (0.983, 0.25), (0.983, 0.75),
+]
+// Opaque topbar surface, used to measure the snapshot pipeline's global color
+// bias between the two backdrop runs. It never takes the shell's opacity.
+let calibrationPoints: [(Double, Double)] = [(0.50, 0.05)]
+
+func backgroundDiff(_ lhs: PixelImage, _ rhs: PixelImage, points: [(Double, Double)] = shellBackgroundPoints) -> ImageDiff {
     guard lhs.width == rhs.width, lhs.height == rhs.height else {
         return ImageDiff(mean: .infinity, maxChannel: 255, changedFraction: 1)
     }
     // Fixed patches in the shell's left/right padding. These never contain text,
     // controls, or the transparent workspace/resize layers, so the comparison
     // isolates the shell material itself even when content timing differs.
-    let points: [(Double, Double)] = [
-        (0.017, 0.25), (0.017, 0.50), (0.017, 0.75), (0.983, 0.25), (0.983, 0.75),
-    ]
     var total = 0.0
     var maxChannel = 0
     var changed = 0
@@ -455,6 +459,12 @@ func runTests(url: URL, outputDirectory: URL) {
         }
         caseReport["backgroundDiff"] = diffs
         caseReport["backgroundPixelDiff"] = backgroundDiffs
+        let calibration = backgroundDiff(runA.images["ready"]!, runB.images["ready"]!, points: calibrationPoints)
+        caseReport["backgroundCalibration"] = [
+            "mean": calibration.mean,
+            "maxChannel": calibration.maxChannel,
+            "changedFraction": calibration.changedFraction,
+        ]
         caseReport["stability"] = stability
         report.append(caseReport)
 
@@ -478,8 +488,9 @@ func runTests(url: URL, outputDirectory: URL) {
         switch item.opacity {
         case 100:
             for (state, value) in [("firstPaint", firstDiff), ("ready", aDiff), ("blur", blurDiff), ("focus", focusDiff), ("dragging", dragDiff), ("restored", restoredDiff)] {
-                if value.mean > 0.2 || value.maxChannel > 2 {
-                    failures.append("\(item.name)-\(state): background pixels leaked mean=\(value.mean) max=\(value.maxChannel)")
+                let calibrated = max(0, value.mean - calibration.mean)
+                if calibrated > 0.2 || value.maxChannel > 2 {
+                    failures.append("\(item.name)-\(state): background pixels leaked mean=\(value.mean) calibrated=\(calibrated) baseline=\(calibration.mean) max=\(value.maxChannel)")
                 }
             }
             // Content is settled after the first paint; allow only tiny antialiasing
